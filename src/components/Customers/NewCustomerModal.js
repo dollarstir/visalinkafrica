@@ -1,7 +1,26 @@
 import React, { useState } from 'react';
 import { X, User, Mail, Phone, MapPin, AlertCircle } from 'lucide-react';
+import { showError } from '../../utils/toast';
 
-const NewCustomerModal = ({ onClose }) => {
+const genderOptions = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+  { value: 'prefer_not_to_say', label: 'Prefer not to say' }
+];
+
+const countryOptions = [
+  { value: 'US', label: 'United States' },
+  { value: 'CA', label: 'Canada' },
+  { value: 'UK', label: 'United Kingdom' },
+  { value: 'AU', label: 'Australia' },
+  { value: 'NG', label: 'Nigeria' },
+  { value: 'GH', label: 'Ghana' },
+  { value: 'KE', label: 'Kenya' },
+  { value: 'ZA', label: 'South Africa' }
+];
+
+const NewCustomerModal = ({ onClose, onSave }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -10,6 +29,12 @@ const NewCustomerModal = ({ onClose }) => {
     address: '',
     dateOfBirth: '',
     nationality: '',
+    passportNumber: '',
+    gender: '',
+    occupation: '',
+    city: '',
+    state: '',
+    country: '',
     emergencyContact: '',
     emergencyPhone: '',
     notes: ''
@@ -49,12 +74,16 @@ const NewCustomerModal = ({ onClose }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (validateForm()) {
-      // Handle form submission - API call will go here
-      console.log('Form submitted:', formData);
+      try {
+        await onSave?.(formData);
+      } catch (err) {
+        showError(err?.message || 'Failed to add customer');
+        return;
+      }
       onClose();
     }
   };
@@ -193,6 +222,19 @@ const NewCustomerModal = ({ onClose }) => {
                     placeholder="Enter nationality"
                   />
                 </div>
+
+                {/* Passport Number */}
+                <div>
+                  <label className="label">Passport Number</label>
+                  <input
+                    type="text"
+                    name="passportNumber"
+                    value={formData.passportNumber}
+                    onChange={handleInputChange}
+                    className="input-field"
+                    placeholder="Enter passport number"
+                  />
+                </div>
               </div>
 
               {/* Address */}
@@ -207,6 +249,82 @@ const NewCustomerModal = ({ onClose }) => {
                     rows={3}
                     className="input-field pl-10"
                     placeholder="Enter full address"
+                  />
+                </div>
+              </div>
+
+              {/* City, State, Country */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                <div>
+                  <label className="label">City</label>
+                  <input
+                    type="text"
+                    name="city"
+                    value={formData.city}
+                    onChange={handleInputChange}
+                    className="input-field"
+                    placeholder="Enter city"
+                  />
+                </div>
+
+                <div>
+                  <label className="label">State/Province</label>
+                  <input
+                    type="text"
+                    name="state"
+                    value={formData.state}
+                    onChange={handleInputChange}
+                    className="input-field"
+                    placeholder="Enter state"
+                  />
+                </div>
+
+                <div>
+                  <label className="label">Country</label>
+                  <select
+                    name="country"
+                    value={formData.country}
+                    onChange={handleInputChange}
+                    className="input-field"
+                  >
+                    <option value="">Select country</option>
+                    {countryOptions.map(country => (
+                      <option key={country.value} value={country.value}>
+                        {country.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Gender and Occupation */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="label">Gender</label>
+                  <select
+                    name="gender"
+                    value={formData.gender}
+                    onChange={handleInputChange}
+                    className="input-field"
+                  >
+                    <option value="">Select gender</option>
+                    {genderOptions.map(gender => (
+                      <option key={gender.value} value={gender.value}>
+                        {gender.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="label">Occupation</label>
+                  <input
+                    type="text"
+                    name="occupation"
+                    value={formData.occupation}
+                    onChange={handleInputChange}
+                    className="input-field"
+                    placeholder="Enter occupation"
                   />
                 </div>
               </div>

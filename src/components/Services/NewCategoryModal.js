@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, FolderOpen, AlertCircle } from 'lucide-react';
 
-const NewCategoryModal = ({ onClose }) => {
+const NewCategoryModal = ({ onClose, onSave }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -45,12 +45,17 @@ const NewCategoryModal = ({ onClose }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (validateForm()) {
-      // Handle form submission - API call will go here
-      console.log('Form submitted:', formData);
+      if (onSave) {
+        await onSave({
+          name: formData.name.trim(),
+          description: formData.description.trim(),
+          is_active: formData.isActive
+        });
+      }
       onClose();
     }
   };

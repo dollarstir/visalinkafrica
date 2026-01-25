@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -14,85 +14,97 @@ import {
   MapPin,
   Briefcase
 } from 'lucide-react';
+import apiService from '../../services/api';
+import { showSuccess, showError, showDeleteConfirm } from '../../utils/toast';
+import { useAuth } from '../Auth/AuthContext';
+import { hasPermission } from '../../utils/permissions';
 import NewStaffModal from './NewStaffModal';
+import EditStaffModal from './EditStaffModal';
+import ViewStaffModal from './ViewStaffModal';
 
 const Staff = () => {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showNewStaffModal, setShowNewStaffModal] = useState(false);
+  const [showEditStaffModal, setShowEditStaffModal] = useState(false);
+  const [showViewStaffModal, setShowViewStaffModal] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState(null);
+  const [staff, setStaff] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data - replace with API calls
-  const staff = [
-    {
-      id: 'STAFF-001',
-      firstName: 'Sarah',
-      lastName: 'Wilson',
-      email: 'sarah@visalink.com',
-      phone: '+1 (555) 111-2222',
-      position: 'Senior Consultant',
-      department: 'Consultation',
-      hireDate: '2023-01-15',
-      salary: '$65,000',
-      status: 'Active',
-      location: 'Main Office',
-      workingHours: '9:00 AM - 5:00 PM',
-      totalApplications: 45,
-      currentWorkload: 'Medium',
-      statusColor: 'bg-green-100 text-green-800'
-    },
-    {
-      id: 'STAFF-002',
-      firstName: 'Mike',
-      lastName: 'Johnson',
-      email: 'mike@visalink.com',
-      phone: '+1 (555) 333-4444',
-      position: 'Document Specialist',
-      department: 'Documentation',
-      hireDate: '2023-03-20',
-      salary: '$55,000',
-      status: 'Active',
-      location: 'Main Office',
-      workingHours: '8:30 AM - 4:30 PM',
-      totalApplications: 32,
-      currentWorkload: 'High',
-      statusColor: 'bg-green-100 text-green-800'
-    },
-    {
-      id: 'STAFF-003',
-      firstName: 'Lisa',
-      lastName: 'Davis',
-      email: 'lisa@visalink.com',
-      phone: '+1 (555) 555-6666',
-      position: 'Customer Service Rep',
-      department: 'Customer Service',
-      hireDate: '2023-06-10',
-      salary: '$45,000',
-      status: 'Active',
-      location: 'Main Office',
-      workingHours: '9:00 AM - 6:00 PM',
-      totalApplications: 28,
-      currentWorkload: 'Low',
-      statusColor: 'bg-green-100 text-green-800'
-    },
-    {
-      id: 'STAFF-004',
-      firstName: 'David',
-      lastName: 'Brown',
-      email: 'david@visalink.com',
-      phone: '+1 (555) 777-8888',
-      position: 'Junior Consultant',
-      department: 'Consultation',
-      hireDate: '2023-09-05',
-      salary: '$50,000',
-      status: 'On Leave',
-      location: 'Main Office',
-      workingHours: '9:00 AM - 5:00 PM',
-      totalApplications: 15,
-      currentWorkload: 'None',
-      statusColor: 'bg-yellow-100 text-yellow-800'
+  // Load staff data from API
+  useEffect(() => {
+    loadStaff();
+  }, []);
+
+  const loadStaff = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Build params object - only include defined, non-empty values
+      const params = {
+        limit: 100,
+        page: 1
+      };
+      
+      if (searchTerm && searchTerm.trim()) {
+        params.search = searchTerm.trim();
+      }
+      
+      if (statusFilter && statusFilter !== 'all') {
+        params.status = statusFilter;
+      }
+      
+      const response = await apiService.getStaff(params);
+      console.log('Staff API response:', response);
+      
+      // Transform API data to match component format
+      const transformedStaff = (response.staff || []).map(member => ({
+        id: member.id.toString(),
+        firstName: member.first_name,
+        lastName: member.last_name,
+        email: member.email,
+        phone: member.phone || '',
+        position: member.position || '',
+        department: member.department || '',
+        hireDate: member.hire_date || '',
+        salary: member.salary || '',
+        status: member.status ? member.status.charAt(0).toUpperCase() + member.status.slice(1) : 'Active',
+        location: member.location || '',
+        workingHours: member.working_hours || '',
+        totalApplications: member.total_applications || 0,
+        currentWorkload: member.current_workload ? member.current_workload.charAt(0).toUpperCase() + member.current_workload.slice(1) : 'Low',
+        statusColor: getStatusColor(member.status),
+        userId: member.user_id || null
+      }));
+      
+      setStaff(transformedStaff);
+    } catch (err) {
+      console.error('Error loading staff:', err);
+      setError(err.message || 'Failed to load staff. Please try again.');
+      showError(err.message || 'Failed to load staff. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'active':
+        return 'bg-green-100 text-green-800';
+      case 'on-leave':
+      case 'on_leave':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'inactive':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
 
   const departmentOptions = [
     { value: 'all', label: 'All Departments' },
@@ -113,14 +125,14 @@ const Staff = () => {
     const matchesSearch = member.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          member.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         member.position.toLowerCase().includes(searchTerm.toLowerCase());
+                         String(member.id).includes(searchTerm) ||
+                         (member.position && member.position.toLowerCase().includes(searchTerm.toLowerCase()));
     
     const matchesDepartment = departmentFilter === 'all' || 
-                             member.department.toLowerCase().replace(' ', '-') === departmentFilter;
+                             (member.department && member.department.toLowerCase().replace(/\s+/g, '-') === departmentFilter);
     
     const matchesStatus = statusFilter === 'all' || 
-                         member.status.toLowerCase().replace(' ', '-') === statusFilter;
+                         (member.status && member.status.toLowerCase().replace(/\s+/g, '-') === statusFilter);
     
     return matchesSearch && matchesDepartment && matchesStatus;
   });
@@ -128,14 +140,77 @@ const Staff = () => {
   const getStatusCounts = () => {
     const counts = {
       total: staff.length,
-      active: staff.filter(member => member.status === 'Active').length,
-      onLeave: staff.filter(member => member.status === 'On Leave').length,
-      inactive: staff.filter(member => member.status === 'Inactive').length
+      active: staff.filter(member => member.status && member.status.toLowerCase() === 'active').length,
+      onLeave: staff.filter(member => member.status && (member.status.toLowerCase() === 'on-leave' || member.status.toLowerCase() === 'on leave')).length,
+      inactive: staff.filter(member => member.status && member.status.toLowerCase() === 'inactive').length
     };
     return counts;
   };
 
   const statusCounts = getStatusCounts();
+
+  const handleViewStaff = (member) => {
+    setSelectedStaff(member);
+    setShowViewStaffModal(true);
+  };
+
+  const handleEditStaff = (member) => {
+    setSelectedStaff(member);
+    setShowEditStaffModal(true);
+  };
+
+  const handleDeleteStaff = async (memberId) => {
+    const member = staff.find(s => s.id === memberId);
+    const confirmed = await showDeleteConfirm(
+      member ? `${member.firstName} ${member.lastName}` : 'this staff member',
+      'staff member'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      setLoading(true);
+      await apiService.deleteStaffMember(memberId);
+      showSuccess('Staff member deleted successfully');
+      await loadStaff();
+    } catch (err) {
+      console.error('Error deleting staff:', err);
+      showError(err.message || 'Failed to delete staff member. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddStaff = async (staffData) => {
+    try {
+      setLoading(true);
+      await apiService.createStaffMember(staffData);
+      showSuccess('Staff member created successfully');
+      await loadStaff();
+      setShowNewStaffModal(false);
+    } catch (err) {
+      console.error('Error adding staff:', err);
+      showError(err.message || 'Failed to add staff member. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveStaff = async (updatedStaff) => {
+    try {
+      setLoading(true);
+      await apiService.updateStaffMember(selectedStaff.id, updatedStaff);
+      showSuccess('Staff member updated successfully');
+      await loadStaff();
+      setShowEditStaffModal(false);
+      setSelectedStaff(null);
+    } catch (err) {
+      console.error('Error updating staff:', err);
+      showError(err.message || 'Failed to update staff member. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -145,13 +220,15 @@ const Staff = () => {
           <h1 className="text-2xl font-bold text-gray-900">Staff Management</h1>
           <p className="text-gray-600">Manage staff members, payroll, and leave requests</p>
         </div>
-        <button
-          onClick={() => setShowNewStaffModal(true)}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Add Staff Member</span>
-        </button>
+        {hasPermission(user, 'staff.create') && (
+          <button
+            onClick={() => setShowNewStaffModal(true)}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Add Staff Member</span>
+          </button>
+        )}
       </div>
 
       {/* Status Overview */}
@@ -250,8 +327,12 @@ const Staff = () => {
       </div>
 
       {/* Staff Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredStaff.map((member) => (
+      {error && <div className="card text-red-600">{error}</div>}
+      {loading ? (
+        <div className="card">Loading staff...</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredStaff.map((member) => (
           <div key={member.id} className="card hover:shadow-md transition-shadow duration-200">
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center">
@@ -314,26 +395,67 @@ const Staff = () => {
             </div>
 
             <div className="flex space-x-2">
-              <button className="flex-1 btn-outline text-sm">
-                <Eye className="h-4 w-4 mr-1" />
-                View
-              </button>
-              <button className="flex-1 btn-secondary text-sm">
-                <Edit className="h-4 w-4 mr-1" />
-                Edit
-              </button>
-              <button className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-200">
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {hasPermission(user, 'staff.view') && (
+                <button 
+                  onClick={() => handleViewStaff(member)}
+                  className="flex-1 btn-outline text-sm"
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  View
+                </button>
+              )}
+              {hasPermission(user, 'staff.edit') && (
+                <button 
+                  onClick={() => handleEditStaff(member)}
+                  className="flex-1 btn-secondary text-sm"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Edit
+                </button>
+              )}
+              {hasPermission(user, 'staff.delete') && (
+                <button 
+                  onClick={() => handleDeleteStaff(member.id)}
+                  className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                  title="Delete staff member"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* New Staff Modal */}
       {showNewStaffModal && (
         <NewStaffModal
           onClose={() => setShowNewStaffModal(false)}
+          onSave={handleAddStaff}
+        />
+      )}
+
+      {/* Edit Staff Modal */}
+      {showEditStaffModal && selectedStaff && (
+        <EditStaffModal
+          staff={selectedStaff}
+          onClose={() => {
+            setShowEditStaffModal(false);
+            setSelectedStaff(null);
+          }}
+          onSave={handleSaveStaff}
+        />
+      )}
+
+      {/* View Staff Modal */}
+      {showViewStaffModal && selectedStaff && (
+        <ViewStaffModal
+          staff={selectedStaff}
+          onClose={() => {
+            setShowViewStaffModal(false);
+            setSelectedStaff(null);
+          }}
         />
       )}
     </div>

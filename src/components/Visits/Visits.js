@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import apiService from '../../services/api';
 import { 
   Plus, 
   Search, 
@@ -11,80 +12,84 @@ import {
   FileText,
   CheckCircle
 } from 'lucide-react';
+import { showSuccess, showError, showDeleteConfirm } from '../../utils/toast';
+import { useAuth } from '../Auth/AuthContext';
+import { hasPermission } from '../../utils/permissions';
+import { Navigate } from 'react-router-dom';
 import NewVisitModal from './NewVisitModal';
+import ViewVisitModal from './ViewVisitModal';
+import EditVisitModal from './EditVisitModal';
 
 const Visits = () => {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showNewVisitModal, setShowNewVisitModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedVisit, setSelectedVisit] = useState(null);
+  const [visits, setVisits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data - replace with API calls
-  const visits = [
-    {
-      id: 'VISIT-001',
-      customerName: 'John Doe',
-      customerEmail: 'john@example.com',
-      visitType: 'Consultation',
-      visitDate: '2024-01-15',
-      visitTime: '10:00 AM',
-      duration: '60 minutes',
-      status: 'Completed',
-      staffMember: 'Sarah Wilson',
-      location: 'Office - Room A',
-      purpose: 'Visa application consultation',
-      outcome: 'Application submitted successfully',
-      followUpRequired: false,
-      statusColor: 'bg-green-100 text-green-800'
-    },
-    {
-      id: 'VISIT-002',
-      customerName: 'Jane Smith',
-      customerEmail: 'jane@example.com',
-      visitType: 'Document Review',
-      visitDate: '2024-01-14',
-      visitTime: '2:00 PM',
-      duration: '30 minutes',
-      status: 'Completed',
-      staffMember: 'Mike Johnson',
-      location: 'Office - Room B',
-      purpose: 'Passport document verification',
-      outcome: 'Documents approved',
-      followUpRequired: true,
-      statusColor: 'bg-green-100 text-green-800'
-    },
-    {
-      id: 'VISIT-003',
-      customerName: 'Mike Johnson',
-      customerEmail: 'mike@example.com',
-      visitType: 'Follow-up',
-      visitDate: '2024-01-13',
-      visitTime: '11:30 AM',
-      duration: '45 minutes',
-      status: 'Scheduled',
-      staffMember: 'Lisa Davis',
-      location: 'Office - Room A',
-      purpose: 'Application status update',
-      outcome: '',
-      followUpRequired: false,
-      statusColor: 'bg-blue-100 text-blue-800'
-    },
-    {
-      id: 'VISIT-004',
-      customerName: 'Sarah Wilson',
-      customerEmail: 'sarah@example.com',
-      visitType: 'Initial Consultation',
-      visitDate: '2024-01-12',
-      visitTime: '9:00 AM',
-      duration: '90 minutes',
-      status: 'Cancelled',
-      staffMember: 'David Brown',
-      location: 'Office - Room C',
-      purpose: 'New customer consultation',
-      outcome: 'Customer cancelled due to emergency',
-      followUpRequired: true,
-      statusColor: 'bg-red-100 text-red-800'
+  // Load visits data from API
+  useEffect(() => {
+    loadVisits();
+  }, []);
+
+  // Check if user has permission to view visits
+  if (!hasPermission(user, 'visits.view') && user?.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
+  const loadVisits = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getVisits();
+      
+      // Transform API data to match component format
+      const transformedVisits = response.visits.map(visit => ({
+        id: visit.id.toString(),
+        customerName: visit.customer_name,
+        customerEmail: visit.customer_email,
+        visitType: visit.visit_type,
+        visitDate: new Date(visit.visit_date).toLocaleDateString(),
+        visitTime: visit.visit_time,
+        duration: visit.duration,
+        status: visit.status.charAt(0).toUpperCase() + visit.status.slice(1).replace('_', ' '),
+        staffMember: visit.staff_member,
+        location: visit.location,
+        purpose: visit.purpose,
+        outcome: visit.outcome,
+        followUpRequired: visit.follow_up_required,
+        statusColor: getStatusColor(visit.status)
+      }));
+      
+      setVisits(transformedVisits);
+      setError(null);
+    } catch (err) {
+      console.error('Error loading visits:', err);
+      setError('Failed to load visits. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const getStatusColor = (status) => {
+    switch (status.toLowerCase()) {
+      case 'scheduled':
+        return 'bg-blue-100 text-blue-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'no_show':
+      case 'no-show':
+        return 'bg-red-100 text-red-800';
+      case 'cancelled':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
 
   const statusOptions = [
     { value: 'all', label: 'All Status' },
@@ -115,6 +120,67 @@ const Visits = () => {
 
   const statusCounts = getStatusCounts();
 
+  const handleViewVisit = (visit) => {
+    setSelectedVisit(visit);
+    setShowViewModal(true);
+  };
+
+  const handleEditVisit = (visit) => {
+    setSelectedVisit(visit);
+    setShowEditModal(true);
+  };
+
+  const handleAddVisit = async (visitData) => {
+    try {
+      setLoading(true);
+      await apiService.createVisit(visitData);
+      showSuccess('Visit created successfully');
+      await loadVisits(); // Refresh the list
+      setShowNewVisitModal(false);
+    } catch (err) {
+      console.error('Error adding visit:', err);
+      showError(err.message || 'Failed to add visit. Please try again.');
+      setError(err.message || 'Failed to add visit. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveVisit = async (updatedVisit) => {
+    try {
+      setLoading(true);
+      await apiService.updateVisit(selectedVisit.id, updatedVisit);
+      showSuccess('Visit updated successfully');
+      await loadVisits(); // Refresh the list
+      setShowEditModal(false);
+      setSelectedVisit(null);
+    } catch (err) {
+      console.error('Error updating visit:', err);
+      showError(err.message || 'Failed to update visit. Please try again.');
+      setError(err.message || 'Failed to update visit. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteVisit = async (visitId) => {
+    const confirmed = await showDeleteConfirm('this visit', 'visit');
+    
+    if (confirmed) {
+      try {
+        setLoading(true);
+        await apiService.deleteVisit(visitId);
+        showSuccess('Visit deleted successfully');
+        await loadVisits(); // Refresh the list
+      } catch (err) {
+        console.error('Error deleting visit:', err);
+        setError('Failed to delete visit. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -123,13 +189,15 @@ const Visits = () => {
           <h1 className="text-2xl font-bold text-gray-900">Visits</h1>
           <p className="text-gray-600">Track and manage customer visits and consultations</p>
         </div>
-        <button
-          onClick={() => setShowNewVisitModal(true)}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Schedule Visit</span>
-        </button>
+        {hasPermission(user, 'visits.create') && (
+          <button
+            onClick={() => setShowNewVisitModal(true)}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Schedule Visit</span>
+          </button>
+        )}
       </div>
 
       {/* Status Overview */}
@@ -268,15 +336,33 @@ const Visits = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
-                      <button className="text-primary-600 hover:text-primary-900">
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button className="text-gray-600 hover:text-gray-900">
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button className="text-red-600 hover:text-red-900">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {hasPermission(user, 'visits.view') && (
+                        <button 
+                          onClick={() => handleViewVisit(visit)}
+                          className="text-primary-600 hover:text-primary-900"
+                          title="View visit details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                      )}
+                      {hasPermission(user, 'visits.edit') && (
+                        <button 
+                          onClick={() => handleEditVisit(visit)}
+                          className="text-gray-600 hover:text-gray-900"
+                          title="Edit visit"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                      )}
+                      {hasPermission(user, 'visits.delete') && (
+                        <button 
+                          onClick={() => handleDeleteVisit(visit.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete visit"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -286,10 +372,32 @@ const Visits = () => {
         </div>
       </div>
 
-      {/* New Visit Modal */}
+      {/* Modals */}
       {showNewVisitModal && (
         <NewVisitModal
           onClose={() => setShowNewVisitModal(false)}
+          onSave={handleAddVisit}
+        />
+      )}
+
+      {showViewModal && selectedVisit && (
+        <ViewVisitModal
+          visit={selectedVisit}
+          onClose={() => {
+            setShowViewModal(false);
+            setSelectedVisit(null);
+          }}
+        />
+      )}
+
+      {showEditModal && selectedVisit && (
+        <EditVisitModal
+          visit={selectedVisit}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedVisit(null);
+          }}
+          onSave={handleSaveVisit}
         />
       )}
     </div>

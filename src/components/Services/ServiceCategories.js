@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -12,13 +12,142 @@ import {
   AlertCircle
 } from 'lucide-react';
 import NewCategoryModal from './NewCategoryModal';
+import ViewCategoryModal from './ViewCategoryModal';
+import EditCategoryModal from './EditCategoryModal';
+import apiService from '../../services/api';
+import { showSuccess, showError, showDeleteConfirm } from '../../utils/toast';
+import { useAuth } from '../Auth/AuthContext';
+import { hasPermission } from '../../utils/permissions';
+import { Navigate } from 'react-router-dom';
 
 const ServiceCategories = () => {
+  const { user } = useAuth();
   const [showNewCategoryModal, setShowNewCategoryModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  // Check if user has permission to view service categories
+  if (!hasPermission(user, 'service_categories.view') && user?.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
+  const loadCategories = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await apiService.getServiceCategories({ page: 1, limit: 100 });
+      
+      // Also fetch services for each category to show service names
+      const categoriesWithServices = await Promise.all(
+        (response.categories || []).map(async (cat) => {
+          try {
+            const servicesResponse = await apiService.getServices({ category: cat.id, limit: 10 });
+            return {
+              ...cat,
+              services: (servicesResponse.services || []).map(s => s.name)
+            };
+          } catch (err) {
+            return { ...cat, services: [] };
+          }
+        })
+      );
+
+      const transformedCategories = categoriesWithServices.map(cat => ({
+        id: cat.id.toString(),
+        name: cat.name,
+        description: cat.description || '',
+        totalServices: parseInt(cat.total_services) || 0,
+        isActive: cat.is_active !== false,
+        createdAt: cat.created_at ? new Date(cat.created_at).toLocaleDateString() : '',
+        updatedAt: cat.updated_at ? new Date(cat.updated_at).toLocaleDateString() : '',
+        services: cat.services || [],
+        statusColor: cat.is_active !== false ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+      }));
+
+      setCategories(transformedCategories);
+    } catch (err) {
+      console.error('Error loading categories:', err);
+      setError(err.message || 'Failed to load categories');
+      showError(err.message || 'Failed to load categories');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId) => {
+    const category = categories.find(c => c.id === categoryId);
+    const confirmed = await showDeleteConfirm(
+      category ? category.name : 'this category',
+      'category'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      setLoading(true);
+      await apiService.deleteServiceCategory(categoryId);
+      showSuccess('Category deleted successfully');
+      await loadCategories();
+    } catch (err) {
+      console.error('Error deleting category:', err);
+      showError(err.message || 'Failed to delete category. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewCategory = (category) => {
+    setSelectedCategory(category);
+    setShowViewModal(true);
+  };
+
+  const handleEditCategory = (category) => {
+    setSelectedCategory(category);
+    setShowEditModal(true);
+  };
+
+  const handleAddCategory = async (categoryData) => {
+    try {
+      setLoading(true);
+      await apiService.createServiceCategory(categoryData);
+      showSuccess('Category created successfully');
+      await loadCategories();
+      setShowNewCategoryModal(false);
+    } catch (err) {
+      console.error('Error adding category:', err);
+      showError(err.message || 'Failed to add category. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveCategory = async (updatedCategory) => {
+    try {
+      setLoading(true);
+      await apiService.updateServiceCategory(selectedCategory.id, updatedCategory);
+      showSuccess('Category updated successfully');
+      await loadCategories();
+      setShowEditModal(false);
+      setSelectedCategory(null);
+    } catch (err) {
+      console.error('Error updating category:', err);
+      showError(err.message || 'Failed to update category. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Mock data - replace with API calls
-  const categories = [
+  const oldCategories = [
     {
       id: 'CAT-001',
       name: 'Document',
@@ -83,6 +212,20 @@ const ServiceCategories = () => {
 
   const statusCounts = getStatusCounts();
 
+  if (loading && categories.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Service Categories</h1>
+          <p className="text-gray-600">Manage service categories and organize your services</p>
+        </div>
+        <div className="card text-center py-12">
+          <p className="text-gray-600">Loading categories...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -91,13 +234,15 @@ const ServiceCategories = () => {
           <h1 className="text-2xl font-bold text-gray-900">Service Categories</h1>
           <p className="text-gray-600">Manage service categories and organize your services</p>
         </div>
-        <button
-          onClick={() => setShowNewCategoryModal(true)}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Add Category</span>
-        </button>
+        {hasPermission(user, 'service_categories.create') && (
+          <button
+            onClick={() => setShowNewCategoryModal(true)}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Add Category</span>
+          </button>
+        )}
       </div>
 
       {/* Status Overview */}
@@ -177,17 +322,33 @@ const ServiceCategories = () => {
             </div>
 
             <div className="flex space-x-2">
-              <button className="flex-1 btn-outline text-sm">
-                <Eye className="h-4 w-4 mr-1" />
-                View
-              </button>
-              <button className="flex-1 btn-secondary text-sm">
-                <Edit className="h-4 w-4 mr-1" />
-                Edit
-              </button>
-              <button className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-200">
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {hasPermission(user, 'service_categories.view') && (
+                <button 
+                  onClick={() => handleViewCategory(category)}
+                  className="flex-1 btn-outline text-sm"
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  View
+                </button>
+              )}
+              {hasPermission(user, 'service_categories.edit') && (
+                <button 
+                  onClick={() => handleEditCategory(category)}
+                  className="flex-1 btn-secondary text-sm"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Edit
+                </button>
+              )}
+              {hasPermission(user, 'service_categories.delete') && (
+                <button 
+                  onClick={() => handleDeleteCategory(category.id)}
+                  className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                  title="Delete category"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -201,7 +362,7 @@ const ServiceCategories = () => {
           <p className="text-gray-600 mb-4">
             {searchTerm ? 'Try adjusting your search terms.' : 'Get started by creating your first service category.'}
           </p>
-          {!searchTerm && (
+          {!searchTerm && hasPermission(user, 'service_categories.create') && (
             <button
               onClick={() => setShowNewCategoryModal(true)}
               className="btn-primary"
@@ -216,6 +377,30 @@ const ServiceCategories = () => {
       {showNewCategoryModal && (
         <NewCategoryModal
           onClose={() => setShowNewCategoryModal(false)}
+          onSave={handleAddCategory}
+        />
+      )}
+
+      {/* View Category Modal */}
+      {showViewModal && selectedCategory && (
+        <ViewCategoryModal
+          category={selectedCategory}
+          onClose={() => {
+            setShowViewModal(false);
+            setSelectedCategory(null);
+          }}
+        />
+      )}
+
+      {/* Edit Category Modal */}
+      {showEditModal && selectedCategory && (
+        <EditCategoryModal
+          category={selectedCategory}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedCategory(null);
+          }}
+          onSave={handleSaveCategory}
         />
       )}
     </div>

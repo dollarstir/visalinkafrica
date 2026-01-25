@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, User, Mail, Phone, Calendar, Clock, AlertCircle } from 'lucide-react';
 
-const NewVisitorModal = ({ onClose }) => {
+  const NewVisitorModal = ({ onClose, onSave }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -95,9 +95,30 @@ const NewVisitorModal = ({ onClose }) => {
     e.preventDefault();
     
     if (validateForm()) {
-      // Handle form submission - API call will go here
-      console.log('Form submitted:', formData);
-      onClose();
+      // Prepare data for API
+      const visitorData = {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        purpose: formData.purpose,
+        notes: formData.notes
+      };
+
+      // Add visit details if scheduled
+      if (formData.isScheduled) {
+        visitorData.visit_date = formData.visitDate;
+        visitorData.visit_time = formData.visitTime;
+        visitorData.staff_member = formData.staffMember;
+        visitorData.status = 'scheduled';
+      } else {
+        visitorData.status = 'completed';
+      }
+
+      // Call the onSave prop (which will make the API call)
+      if (onSave) {
+        onSave(visitorData);
+      }
     }
   };
 
@@ -372,4 +393,5 @@ const NewVisitorModal = ({ onClose }) => {
 };
 
 export default NewVisitorModal;
+
 

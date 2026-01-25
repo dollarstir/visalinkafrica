@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -8,21 +8,245 @@ import {
   Trash2,
   Settings,
   FolderOpen,
-  DollarSign,
+  Coins,
   Clock,
   AlertCircle,
   CheckCircle
 } from 'lucide-react';
 import NewServiceModal from './NewServiceModal';
+import EditServiceModal from './EditServiceModal';
+import ViewServiceModal from './ViewServiceModal';
+import apiService from '../../services/api';
+import { showSuccess, showError, showDeleteConfirm } from '../../utils/toast';
+import { formatPrice } from '../../utils/currency';
+import { useAuth } from '../Auth/AuthContext';
+import { hasPermission } from '../../utils/permissions';
+import { Navigate } from 'react-router-dom';
 
 const Services = () => {
+  const { user } = useAuth();
   const [showNewServiceModal, setShowNewServiceModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [services, setServices] = useState([]);
+  const [categories, setCategories] = useState([{ id: 'all', name: 'All Categories' }]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedService, setSelectedService] = useState(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  useEffect(() => {
+    loadServices();
+    loadCategories();
+  }, [categoryFilter, statusFilter]);
+
+  const loadCategories = async () => {
+    try {
+      const response = await apiService.getServiceCategories({ page: 1, limit: 100 });
+      const categoryOptions = [
+        { id: 'all', name: 'All Categories' },
+        ...(response.categories || []).map(cat => ({
+          id: cat.id.toString(),
+          name: cat.name
+        }))
+      ];
+      setCategories(categoryOptions);
+    } catch (err) {
+      console.error('Error loading categories:', err);
+    }
+  };
+
+  const loadServices = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const params = { page: 1, limit: 100 };
+      if (searchTerm) params.search = searchTerm;
+      if (categoryFilter !== 'all') params.category = categoryFilter;
+      
+      const response = await apiService.getServices(params);
+      
+      const transformedServices = (response.services || []).map(service => {
+        // Parse pricing_tiers - PostgreSQL JSONB is already parsed by node-postgres
+        let pricingTiers = [];
+        if (service.pricing_tiers) {
+          try {
+            if (typeof service.pricing_tiers === 'string') {
+              // If it's a string, parse it
+              pricingTiers = JSON.parse(service.pricing_tiers);
+            } else if (Array.isArray(service.pricing_tiers)) {
+              // If it's already an array (JSONB auto-parsed), use it directly
+              pricingTiers = service.pricing_tiers;
+            } else if (typeof service.pricing_tiers === 'object' && service.pricing_tiers !== null) {
+              // If it's an object, convert to array
+              pricingTiers = [service.pricing_tiers];
+            }
+            
+            // Ensure it's an array
+            if (!Array.isArray(pricingTiers)) {
+              pricingTiers = [];
+            }
+          } catch (e) {
+            console.error('Error parsing pricing_tiers:', e, service.pricing_tiers);
+            pricingTiers = [];
+          }
+        }
+
+        // Parse requirements if it's a string
+        let requirements = [];
+        if (service.requirements) {
+          requirements = Array.isArray(service.requirements) 
+            ? service.requirements 
+            : [];
+        }
+
+        return {
+          id: `SRV-${String(service.id).padStart(3, '0')}`,
+          name: service.name,
+          category: service.category_name || 'Uncategorized',
+          categoryId: service.category_id ? service.category_id.toString() : '',
+          description: service.description || '',
+          pricingTiers: pricingTiers,
+          isActive: service.is_active !== false,
+          totalApplications: typeof service.total_applications === 'number' 
+            ? service.total_applications 
+            : parseInt(service.total_applications) || 0,
+          successRate: service.success_rate ? `${service.success_rate}%` : '0%',
+          createdAt: service.created_at ? new Date(service.created_at).toLocaleDateString() : '',
+          updatedAt: service.updated_at ? new Date(service.updated_at).toLocaleDateString() : '',
+          requirements: requirements,
+          statusColor: service.is_active !== false ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800',
+          // For API calls
+          serviceId: service.id
+        };
+      });
+
+      // Apply status filter on frontend
+      let filtered = transformedServices;
+      if (statusFilter !== 'all') {
+        filtered = transformedServices.filter(service => {
+          if (statusFilter === 'active') return service.isActive;
+          if (statusFilter === 'inactive') return !service.isActive;
+          return true;
+        });
+      }
+
+      setServices(filtered);
+    } catch (err) {
+      console.error('Error loading services:', err);
+      setError(err.message || 'Failed to load services');
+      showError(err.message || 'Failed to load services');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (!loading) {
+        loadServices();
+      }
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  const handleDeleteService = async (serviceId) => {
+    const service = services.find(s => s.serviceId === serviceId);
+    const confirmed = await showDeleteConfirm(
+      service ? service.name : 'this service',
+      'service'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      setLoading(true);
+      await apiService.deleteService(serviceId);
+      showSuccess('Service deleted successfully');
+      await loadServices();
+    } catch (err) {
+      console.error('Error deleting service:', err);
+      showError(err.message || 'Failed to delete service. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewService = (service) => {
+    setSelectedService(service);
+    setShowViewModal(true);
+  };
+
+  const handleEditService = (service) => {
+    setSelectedService(service);
+    setShowEditModal(true);
+  };
+
+  const handleAddService = async (serviceData) => {
+    try {
+      setLoading(true);
+      await apiService.createService(serviceData);
+      showSuccess('Service created successfully');
+      await loadServices();
+      setShowNewServiceModal(false);
+    } catch (err) {
+      console.error('Error adding service:', err);
+      showError(err.message || 'Failed to add service. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveService = async (updatedService) => {
+    try {
+      setLoading(true);
+      
+      // Transform data from camelCase to snake_case for API
+      // Filter out empty requirements
+      const validRequirements = (updatedService.requirements || []).filter(req => req.trim() !== '');
+      
+      // Format pricing tiers for API - clean price input (remove currency symbols)
+      const pricingTiers = (updatedService.pricingTiers || [])
+        .filter(tier => tier.name.trim() && tier.price.trim() && tier.duration.trim())
+        .map(tier => ({
+          name: tier.name.trim(),
+          price: tier.price.trim().replace(/[^0-9.]/g, ''), // Remove any currency symbols
+          duration: tier.duration.trim(),
+          isDefault: tier.isDefault || false
+        }));
+
+      const serviceData = {
+        name: updatedService.name.trim(),
+        description: updatedService.description.trim(),
+        category_id: updatedService.categoryId ? parseInt(updatedService.categoryId) : null,
+        pricing_tiers: pricingTiers.length > 0 ? pricingTiers : null,
+        requirements: validRequirements.length > 0 ? validRequirements : [],
+        is_active: updatedService.isActive !== false,
+        success_rate: updatedService.successRate ? parseFloat(updatedService.successRate.replace('%', '')) : 0
+      };
+      
+      console.log('Updating service with data:', {
+        serviceId: selectedService.serviceId,
+        serviceData: serviceData
+      });
+      
+      await apiService.updateService(selectedService.serviceId, serviceData);
+      showSuccess('Service updated successfully');
+      await loadServices();
+      setShowEditModal(false);
+      setSelectedService(null);
+    } catch (err) {
+      console.error('Error updating service:', err);
+      showError(err.message || 'Failed to update service. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Mock data - replace with API calls
-  const services = [
+  const oldServices = [
     {
       id: 'SRV-001',
       name: 'Passport Application',
@@ -30,8 +254,8 @@ const Services = () => {
       categoryId: 'CAT-001',
       description: 'Complete passport application service including document preparation and submission',
       pricingTiers: [
-        { name: 'Regular', price: '$150.00', duration: '2-3 weeks', isDefault: true },
-        { name: 'Express', price: '$250.00', duration: '1 week', isDefault: false }
+        { name: 'Regular', price: 'GHS 150.00', duration: '2-3 weeks', isDefault: true },
+        { name: 'Express', price: 'GHS 250.00', duration: '1 week', isDefault: false }
       ],
       isActive: true,
       totalApplications: 45,
@@ -48,8 +272,8 @@ const Services = () => {
       categoryId: 'CAT-001',
       description: 'Birth certificate application and processing service',
       pricingTiers: [
-        { name: 'Regular', price: '$75.00', duration: '1-2 weeks', isDefault: true },
-        { name: 'Express', price: '$125.00', duration: '3-5 days', isDefault: false }
+        { name: 'Regular', price: 'GHS 75.00', duration: '1-2 weeks', isDefault: true },
+        { name: 'Express', price: 'GHS 125.00', duration: '3-5 days', isDefault: false }
       ],
       isActive: true,
       totalApplications: 32,
@@ -66,9 +290,9 @@ const Services = () => {
       categoryId: 'CAT-003',
       description: 'Tourist and business visa application assistance',
       pricingTiers: [
-        { name: 'Standard', price: '$200.00', duration: '3-4 weeks', isDefault: true },
-        { name: 'Express', price: '$350.00', duration: '1-2 weeks', isDefault: false },
-        { name: 'Premium', price: '$500.00', duration: '3-5 days', isDefault: false }
+        { name: 'Standard', price: 'GHS 200.00', duration: '3-4 weeks', isDefault: true },
+        { name: 'Express', price: 'GHS 350.00', duration: '1-2 weeks', isDefault: false },
+        { name: 'Premium', price: 'GHS 500.00', duration: '3-5 days', isDefault: false }
       ],
       isActive: true,
       totalApplications: 28,
@@ -85,7 +309,7 @@ const Services = () => {
       categoryId: 'CAT-002',
       description: 'Primary and secondary school application assistance',
       pricingTiers: [
-        { name: 'Regular', price: '$100.00', duration: '2-4 weeks', isDefault: true }
+        { name: 'Regular', price: 'GHS 100.00', duration: '2-4 weeks', isDefault: true }
       ],
       isActive: true,
       totalApplications: 15,
@@ -102,8 +326,8 @@ const Services = () => {
       categoryId: 'CAT-004',
       description: 'Business registration and licensing services',
       pricingTiers: [
-        { name: 'Standard', price: '$300.00', duration: '4-6 weeks', isDefault: true },
-        { name: 'Express', price: '$450.00', duration: '2-3 weeks', isDefault: false }
+        { name: 'Standard', price: 'GHS 300.00', duration: '4-6 weeks', isDefault: true },
+        { name: 'Express', price: 'GHS 450.00', duration: '2-3 weeks', isDefault: false }
       ],
       isActive: false,
       totalApplications: 8,
@@ -115,46 +339,45 @@ const Services = () => {
     }
   ];
 
-  const categories = [
-    { id: 'all', name: 'All Categories' },
-    { id: 'CAT-001', name: 'Document' },
-    { id: 'CAT-002', name: 'Education' },
-    { id: 'CAT-003', name: 'Travel' },
-    { id: 'CAT-004', name: 'Business' }
-  ];
-
   const statusOptions = [
     { value: 'all', label: 'All Status' },
     { value: 'active', label: 'Active' },
     { value: 'inactive', label: 'Inactive' }
   ];
 
-  const filteredServices = services.filter(service => {
-    const matchesSearch = service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         service.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         service.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         service.category.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = categoryFilter === 'all' || service.categoryId === categoryFilter;
-    
-    const matchesStatus = statusFilter === 'all' || 
-                         (statusFilter === 'active' && service.isActive) ||
-                         (statusFilter === 'inactive' && !service.isActive);
-    
-    return matchesSearch && matchesCategory && matchesStatus;
-  });
+  const filteredServices = services;
 
   const getStatusCounts = () => {
     const counts = {
       total: services.length,
       active: services.filter(service => service.isActive).length,
       inactive: services.filter(service => !service.isActive).length,
-      totalApplications: services.reduce((sum, service) => sum + service.totalApplications, 0)
+      totalApplications: services.reduce((sum, service) => {
+        // Ensure totalApplications is a number before adding
+        const apps = typeof service.totalApplications === 'number' 
+          ? service.totalApplications 
+          : parseInt(service.totalApplications) || 0;
+        return sum + apps;
+      }, 0)
     };
     return counts;
   };
 
   const statusCounts = getStatusCounts();
+
+  if (loading && services.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Services</h1>
+          <p className="text-gray-600">Manage services offered to customers</p>
+        </div>
+        <div className="card text-center py-12">
+          <p className="text-gray-600">Loading services...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -164,13 +387,15 @@ const Services = () => {
           <h1 className="text-2xl font-bold text-gray-900">Services</h1>
           <p className="text-gray-600">Manage services offered to customers</p>
         </div>
-        <button
-          onClick={() => setShowNewServiceModal(true)}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Add Service</span>
-        </button>
+        {hasPermission(user, 'services.create') && (
+          <button
+            onClick={() => setShowNewServiceModal(true)}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Add Service</span>
+          </button>
+        )}
       </div>
 
       {/* Status Overview */}
@@ -267,7 +492,7 @@ const Services = () => {
             <div className="space-y-2 mb-4">
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center text-gray-600">
-                  <DollarSign className="h-4 w-4 mr-1" />
+                  <Coins className="h-4 w-4 mr-1" />
                   Pricing Options
                 </div>
               </div>
@@ -278,7 +503,7 @@ const Services = () => {
                       {tier.name} {tier.isDefault && '(Default)'}
                     </span>
                     <div className="text-right">
-                      <span className="font-medium text-gray-900">{tier.price}</span>
+                      <span className="font-medium text-gray-900">{formatPrice(tier.price)}</span>
                       <span className="text-gray-500 ml-2">({tier.duration})</span>
                     </div>
                   </div>
@@ -317,17 +542,33 @@ const Services = () => {
             </div>
 
             <div className="flex space-x-2">
-              <button className="flex-1 btn-outline text-sm">
-                <Eye className="h-4 w-4 mr-1" />
-                View
-              </button>
-              <button className="flex-1 btn-secondary text-sm">
-                <Edit className="h-4 w-4 mr-1" />
-                Edit
-              </button>
-              <button className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-200">
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {hasPermission(user, 'services.view') && (
+                <button 
+                  onClick={() => handleViewService(service)}
+                  className="flex-1 btn-outline text-sm"
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  View
+                </button>
+              )}
+              {hasPermission(user, 'services.edit') && (
+                <button 
+                  onClick={() => handleEditService(service)}
+                  className="flex-1 btn-secondary text-sm"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Edit
+                </button>
+              )}
+              {hasPermission(user, 'services.delete') && (
+                <button 
+                  onClick={() => handleDeleteService(service.serviceId)}
+                  className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                  title="Delete service"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -356,6 +597,30 @@ const Services = () => {
       {showNewServiceModal && (
         <NewServiceModal
           onClose={() => setShowNewServiceModal(false)}
+          onSave={handleAddService}
+        />
+      )}
+
+      {/* View Service Modal */}
+      {showViewModal && selectedService && (
+        <ViewServiceModal
+          service={selectedService}
+          onClose={() => {
+            setShowViewModal(false);
+            setSelectedService(null);
+          }}
+        />
+      )}
+
+      {/* Edit Service Modal */}
+      {showEditModal && selectedService && (
+        <EditServiceModal
+          service={selectedService}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedService(null);
+          }}
+          onSave={handleSaveService}
         />
       )}
     </div>

@@ -196,3 +196,8 @@ const ViewApplicationModal = ({ application, onClose }) => {
 
 export default ViewApplicationModal;
 
+
+
+
+
+

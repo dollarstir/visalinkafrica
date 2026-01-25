@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Plus, 
   Search, 
@@ -15,70 +15,84 @@ import {
 import NewCustomerModal from './NewCustomerModal';
 import EditCustomerModal from './EditCustomerModal';
 import ViewCustomerModal from './ViewCustomerModal';
+import apiService from '../../services/api';
+import { showSuccess, showError, showDeleteConfirm } from '../../utils/toast';
+import { useAuth } from '../Auth/AuthContext';
+import { hasPermission } from '../../utils/permissions';
 
 const Customers = () => {
+  const { user } = useAuth();
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [showEditCustomerModal, setShowEditCustomerModal] = useState(false);
   const [showViewCustomerModal, setShowViewCustomerModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data - replace with API calls
-  const customers = [
-    {
-      id: 'CUST-001',
-      firstName: 'John',
-      lastName: 'Doe',
-      email: 'john@example.com',
-      phone: '+1 (555) 123-4567',
-      address: '123 Main St, New York, NY 10001',
-      status: 'Active',
-      totalApplications: 3,
-      lastVisit: '2024-01-15',
-      createdAt: '2024-01-01',
-      statusColor: 'bg-green-100 text-green-800'
-    },
-    {
-      id: 'CUST-002',
-      firstName: 'Jane',
-      lastName: 'Smith',
-      email: 'jane@example.com',
-      phone: '+1 (555) 234-5678',
-      address: '456 Oak Ave, Los Angeles, CA 90210',
-      status: 'Active',
-      totalApplications: 1,
-      lastVisit: '2024-01-14',
-      createdAt: '2024-01-02',
-      statusColor: 'bg-green-100 text-green-800'
-    },
-    {
-      id: 'CUST-003',
-      firstName: 'Mike',
-      lastName: 'Johnson',
-      email: 'mike@example.com',
-      phone: '+1 (555) 345-6789',
-      address: '789 Pine Rd, Chicago, IL 60601',
-      status: 'Inactive',
-      totalApplications: 0,
-      lastVisit: '2023-12-20',
-      createdAt: '2023-12-15',
-      statusColor: 'bg-gray-100 text-gray-800'
-    },
-    {
-      id: 'CUST-004',
-      firstName: 'Sarah',
-      lastName: 'Wilson',
-      email: 'sarah@example.com',
-      phone: '+1 (555) 456-7890',
-      address: '321 Elm St, Houston, TX 77001',
-      status: 'Active',
-      totalApplications: 2,
-      lastVisit: '2024-01-12',
-      createdAt: '2023-12-20',
-      statusColor: 'bg-green-100 text-green-800'
+  useEffect(() => {
+    loadCustomers();
+  }, [searchTerm]);
+
+  const loadCustomers = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Build params object - only include defined, non-empty values
+      const params = {
+        limit: 100,
+        page: 1
+      };
+      
+      if (searchTerm && searchTerm.trim()) {
+        params.search = searchTerm.trim();
+      }
+      
+      const data = await apiService.getCustomers(params);
+      console.log('Customers API response:', data); // Debug log
+      
+      const list = data.customers || [];
+      console.log('Customers list:', list); // Debug log
+      
+      setCustomers(
+        list.map((c) => ({
+          id: c.id,
+          firstName: c.first_name,
+          lastName: c.last_name,
+          email: c.email,
+          phone: c.phone,
+          address: c.address,
+          dateOfBirth: c.date_of_birth || '',
+          nationality: c.nationality || '',
+          passportNumber: c.passport_number || '',
+          gender: c.gender || '',
+          occupation: c.occupation || '',
+          city: c.city || '',
+          state: c.state || '',
+          country: c.country || '',
+          emergencyContact: c.emergency_contact || '',
+          emergencyPhone: c.emergency_phone || '',
+          notes: c.notes || '',
+          status: c.status ? c.status.charAt(0).toUpperCase() + c.status.slice(1) : 'Active',
+          totalApplications: 0,
+          lastVisit: c.updated_at ? c.updated_at.split('T')[0] : '',
+          createdAt: c.created_at,
+          statusColor: c.status === 'active' ? 'bg-green-100 text-green-800' : 
+                       c.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
+                       c.status === 'suspended' ? 'bg-red-100 text-red-800' :
+                       'bg-green-100 text-green-800'
+        }))
+      );
+    } catch (err) {
+      console.error('Failed to load customers', err);
+      setError(err.message || 'Failed to load customers');
+      showError(err.message || 'Failed to load customers');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const statusOptions = [
     { value: 'all', label: 'All Status' },
@@ -91,7 +105,7 @@ const Customers = () => {
     const matchesSearch = customer.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          customer.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         customer.id.toLowerCase().includes(searchTerm.toLowerCase());
+                         String(customer.id).includes(searchTerm);
     const matchesStatus = statusFilter === 'all' || customer.status.toLowerCase() === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -106,48 +120,82 @@ const Customers = () => {
     setShowEditCustomerModal(true);
   };
 
-  const handleDeleteCustomer = (customer) => {
-    if (window.confirm(`Are you sure you want to delete customer ${customer.firstName} ${customer.lastName}?`)) {
-      // Handle delete - API call will go here
-      console.log('Deleting customer:', customer.id);
+  const handleDeleteCustomer = async (customer) => {
+    const confirmed = await showDeleteConfirm(
+      `${customer.firstName} ${customer.lastName}`,
+      'customer'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      await apiService.deleteCustomer(customer.id);
+      showSuccess('Customer deleted successfully');
+      await loadCustomers();
+    } catch (err) {
+      showError(err.message || 'Failed to delete customer');
     }
   };
 
-  const handleSaveCustomer = (updatedCustomer) => {
-    // Handle save - API call will go here
-    console.log('Saving customer:', updatedCustomer);
-    // For now, just close the modal
-    setShowEditCustomerModal(false);
-    setSelectedCustomer(null);
+  const handleSaveCustomer = async (payload) => {
+    try {
+      await apiService.updateCustomer(payload.id, {
+        first_name: payload.firstName,
+        last_name: payload.lastName,
+        email: payload.email,
+        phone: payload.phone,
+        address: payload.address,
+        date_of_birth: payload.dateOfBirth,
+        nationality: payload.nationality,
+        passport_number: payload.passportNumber,
+        gender: payload.gender,
+        occupation: payload.occupation,
+        city: payload.city,
+        state: payload.state,
+        country: payload.country,
+        emergency_contact: payload.emergencyContact,
+        emergency_phone: payload.emergencyPhone,
+        notes: payload.notes,
+        status: payload.status ? payload.status.toLowerCase() : 'active'
+      });
+      showSuccess('Customer updated successfully');
+      setShowEditCustomerModal(false);
+      setSelectedCustomer(null);
+      await loadCustomers();
+    } catch (err) {
+      showError(err.message || 'Failed to save customer');
+    }
   };
 
-  const getStatusCounts = () => {
-    const counts = {
-      total: customers.length,
-      active: customers.filter(customer => customer.status === 'Active').length,
-      inactive: customers.filter(customer => customer.status === 'Inactive').length,
-      suspended: customers.filter(customer => customer.status === 'Suspended').length
-    };
-    return counts;
+  const statusCounts = {
+    total: customers.length,
+    active: customers.filter(customer => customer.status && customer.status.toLowerCase() === 'active').length,
+    inactive: customers.filter(customer => customer.status && customer.status.toLowerCase() === 'inactive').length,
+    suspended: customers.filter(customer => customer.status && customer.status.toLowerCase() === 'suspended').length
   };
-
-  const statusCounts = getStatusCounts();
 
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
-          <p className="text-gray-600">Manage customer information and track their applications</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Customers</h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            {user?.role === 'agent' 
+              ? 'Manage your customers and track their applications'
+              : 'Manage customer information and track their applications'
+            }
+          </p>
         </div>
-        <button
-          onClick={() => setShowNewCustomerModal(true)}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Add Customer</span>
-        </button>
+        {(hasPermission(user, 'customers.create') || user?.role === 'agent') && (
+          <button
+            onClick={() => setShowNewCustomerModal(true)}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Add Customer</span>
+          </button>
+        )}
       </div>
 
       {/* Status Overview */}
@@ -202,7 +250,11 @@ const Customers = () => {
       </div>
 
       {/* Customers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {error && <div className="card text-red-600">{error}</div>}
+      {loading ? (
+        <div className="card">Loading customers...</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredCustomers.map((customer) => (
           <div key={customer.id} className="card hover:shadow-md transition-shadow duration-200">
             <div className="flex items-start justify-between mb-4">
@@ -249,36 +301,70 @@ const Customers = () => {
             </div>
 
             <div className="flex space-x-2">
-              <button 
-                onClick={() => handleViewCustomer(customer)}
-                className="flex-1 btn-outline text-sm"
-              >
-                <Eye className="h-4 w-4 mr-1" />
-                View
-              </button>
-              <button 
-                onClick={() => handleEditCustomer(customer)}
-                className="flex-1 btn-secondary text-sm"
-              >
-                <Edit className="h-4 w-4 mr-1" />
-                Edit
-              </button>
-              <button 
-                onClick={() => handleDeleteCustomer(customer)}
-                className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-200"
-                title="Delete Customer"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              {(hasPermission(user, 'customers.view') || user?.role === 'agent') && (
+                <button 
+                  onClick={() => handleViewCustomer(customer)}
+                  className="flex-1 btn-outline text-sm"
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  View
+                </button>
+              )}
+              {(hasPermission(user, 'customers.edit') || user?.role === 'agent') && (
+                <button 
+                  onClick={() => handleEditCustomer(customer)}
+                  className="flex-1 btn-secondary text-sm"
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  Edit
+                </button>
+              )}
+              {(hasPermission(user, 'customers.delete') || user?.role === 'agent') && (
+                <button 
+                  onClick={() => handleDeleteCustomer(customer)}
+                  className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                  title="Delete Customer"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
         ))}
       </div>
+      )}
 
       {/* New Customer Modal */}
       {showNewCustomerModal && (
         <NewCustomerModal
           onClose={() => setShowNewCustomerModal(false)}
+          onSave={async (data) => {
+            try {
+              await apiService.createCustomer({
+                first_name: data.firstName,
+                last_name: data.lastName,
+                email: data.email,
+                phone: data.phone,
+                address: data.address,
+                date_of_birth: data.dateOfBirth,
+                nationality: data.nationality,
+                passport_number: data.passportNumber,
+                gender: data.gender,
+                occupation: data.occupation,
+                city: data.city,
+                state: data.state,
+                country: data.country,
+                emergency_contact: data.emergencyContact,
+                emergency_phone: data.emergencyPhone,
+                notes: data.notes
+              });
+              showSuccess('Customer created successfully');
+              setShowNewCustomerModal(false);
+              await loadCustomers();
+            } catch (err) {
+              showError(err.message || 'Failed to create customer');
+            }
+          }}
         />
       )}
 

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import apiService from '../../services/api';
 import { 
   Plus, 
   Search, 
@@ -8,92 +9,118 @@ import {
   User,
   Calendar,
   Clock,
-  MapPin,
-  CheckCircle,
-  XCircle
+  FileText,
+  CheckCircle
 } from 'lucide-react';
+import { showSuccess, showError, showDeleteConfirm } from '../../utils/toast';
+import { useAuth } from '../Auth/AuthContext';
+import { hasPermission } from '../../utils/permissions';
+import { Navigate } from 'react-router-dom';
 import NewAppointmentModal from './NewAppointmentModal';
+import ViewAppointmentModal from './ViewAppointmentModal';
+import EditAppointmentModal from './EditAppointmentModal';
 
 const Appointments = () => {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [showNewAppointmentModal, setShowNewAppointmentModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  const [appointments, setAppointments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Mock data - replace with API calls
-  const appointments = [
-    {
-      id: 'APT-001',
-      customerName: 'John Doe',
-      customerEmail: 'john@example.com',
-      customerPhone: '+1 (555) 123-4567',
-      service: 'Visa Consultation',
-      appointmentDate: '2024-01-16',
-      appointmentTime: '10:00 AM',
-      duration: '60 minutes',
-      status: 'Confirmed',
-      staffMember: 'Sarah Wilson',
-      location: 'Office - Room A',
-      notes: 'First-time visa applicant',
-      reminderSent: true,
-      statusColor: 'bg-green-100 text-green-800'
-    },
-    {
-      id: 'APT-002',
-      customerName: 'Jane Smith',
-      customerEmail: 'jane@example.com',
-      customerPhone: '+1 (555) 234-5678',
-      service: 'Document Review',
-      appointmentDate: '2024-01-16',
-      appointmentTime: '2:00 PM',
-      duration: '30 minutes',
-      status: 'Pending',
-      staffMember: 'Mike Johnson',
-      location: 'Office - Room B',
-      notes: 'Bringing passport and birth certificate',
-      reminderSent: false,
-      statusColor: 'bg-yellow-100 text-yellow-800'
-    },
-    {
-      id: 'APT-003',
-      customerName: 'Mike Johnson',
-      customerEmail: 'mike@example.com',
-      customerPhone: '+1 (555) 345-6789',
-      service: 'Application Submission',
-      appointmentDate: '2024-01-17',
-      appointmentTime: '9:00 AM',
-      duration: '45 minutes',
-      status: 'Confirmed',
-      staffMember: 'Lisa Davis',
-      location: 'Office - Room A',
-      notes: 'Final submission of visa application',
-      reminderSent: true,
-      statusColor: 'bg-green-100 text-green-800'
-    },
-    {
-      id: 'APT-004',
-      customerName: 'Sarah Wilson',
-      customerEmail: 'sarah@example.com',
-      customerPhone: '+1 (555) 456-7890',
-      service: 'Follow-up Consultation',
-      appointmentDate: '2024-01-15',
-      appointmentTime: '3:30 PM',
-      duration: '30 minutes',
-      status: 'Cancelled',
-      staffMember: 'David Brown',
-      location: 'Office - Room C',
-      notes: 'Customer requested to reschedule',
-      reminderSent: false,
-      statusColor: 'bg-red-100 text-red-800'
+  // Load appointments data from API
+  useEffect(() => {
+    loadAppointments();
+  }, [searchTerm, statusFilter, dateFilter]);
+
+  // Check if user has permission to view appointments
+  if (!hasPermission(user, 'appointments.view') && user?.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
+  const loadAppointments = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Build params object - only include defined, non-empty values
+      const params = {
+        limit: 100,
+        page: 1
+      };
+      
+      if (searchTerm && searchTerm.trim()) {
+        params.search = searchTerm.trim();
+      }
+      
+      if (statusFilter && statusFilter !== 'all') {
+        params.status = statusFilter;
+      }
+      
+      if (dateFilter && dateFilter !== 'all') {
+        params.date = dateFilter;
+      }
+      
+      const response = await apiService.getAppointments(params);
+      console.log('Appointments API response:', response);
+      
+      // Transform API data to match component format
+      const transformedAppointments = (response.appointments || []).map(appointment => ({
+        id: appointment.id.toString(),
+        customerName: appointment.customer_name,
+        customerEmail: appointment.customer_email,
+        customerPhone: appointment.customer_phone || '',
+        service: appointment.service,
+        appointmentDate: appointment.appointment_date,
+        appointmentTime: appointment.appointment_time,
+        duration: appointment.duration || '60',
+        status: appointment.status ? appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1) : 'Pending',
+        staffMember: appointment.staff_member || '',
+        location: appointment.location || '',
+        notes: appointment.notes || '',
+        reminderSent: appointment.reminder_sent || false,
+        statusColor: getStatusColor(appointment.status)
+      }));
+      
+      setAppointments(transformedAppointments);
+    } catch (err) {
+      console.error('Error loading appointments:', err);
+      setError(err.message || 'Failed to load appointments. Please try again.');
+      showError(err.message || 'Failed to load appointments. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'confirmed':
+        return 'bg-blue-100 text-blue-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      case 'no-show':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
 
   const statusOptions = [
     { value: 'all', label: 'All Status' },
     { value: 'pending', label: 'Pending' },
     { value: 'confirmed', label: 'Confirmed' },
+    { value: 'completed', label: 'Completed' },
     { value: 'cancelled', label: 'Cancelled' },
-    { value: 'completed', label: 'Completed' }
+    { value: 'no-show', label: 'No Show' }
   ];
 
   const dateOptions = [
@@ -107,29 +134,88 @@ const Appointments = () => {
   const filteredAppointments = appointments.filter(appointment => {
     const matchesSearch = appointment.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          appointment.customerEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         appointment.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         appointment.service.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || appointment.status.toLowerCase() === statusFilter;
-    
-    // Simple date filtering - in real app, you'd implement proper date logic
-    const matchesDate = dateFilter === 'all' || true; // Placeholder
-    
-    return matchesSearch && matchesStatus && matchesDate;
+                         appointment.service.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         String(appointment.id).includes(searchTerm);
+    const matchesStatus = statusFilter === 'all' || appointment.status.toLowerCase() === statusFilter.toLowerCase();
+    return matchesSearch && matchesStatus;
   });
 
   const getStatusCounts = () => {
     const counts = {
       total: appointments.length,
-      pending: appointments.filter(apt => apt.status === 'Pending').length,
-      confirmed: appointments.filter(apt => apt.status === 'Confirmed').length,
-      cancelled: appointments.filter(apt => apt.status === 'Cancelled').length,
-      completed: appointments.filter(apt => apt.status === 'Completed').length
+      pending: appointments.filter(a => a.status.toLowerCase() === 'pending').length,
+      confirmed: appointments.filter(a => a.status.toLowerCase() === 'confirmed').length,
+      completed: appointments.filter(a => a.status.toLowerCase() === 'completed').length,
+      cancelled: appointments.filter(a => a.status.toLowerCase() === 'cancelled').length
     };
     return counts;
   };
 
   const statusCounts = getStatusCounts();
+
+  const handleViewAppointment = (appointment) => {
+    setSelectedAppointment(appointment);
+    setShowViewModal(true);
+  };
+
+  const handleEditAppointment = (appointment) => {
+    setSelectedAppointment(appointment);
+    setShowEditModal(true);
+  };
+
+  const handleAddAppointment = async (appointmentData) => {
+    try {
+      setLoading(true);
+      await apiService.createAppointment(appointmentData);
+      showSuccess('Appointment created successfully');
+      await loadAppointments();
+      setShowNewAppointmentModal(false);
+    } catch (err) {
+      console.error('Error adding appointment:', err);
+      showError(err.message || 'Failed to add appointment. Please try again.');
+      setError(err.message || 'Failed to add appointment. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveAppointment = async (updatedAppointment) => {
+    try {
+      setLoading(true);
+      await apiService.updateAppointment(selectedAppointment.id, updatedAppointment);
+      showSuccess('Appointment updated successfully');
+      await loadAppointments();
+      setShowEditModal(false);
+      setSelectedAppointment(null);
+    } catch (err) {
+      console.error('Error updating appointment:', err);
+      showError(err.message || 'Failed to update appointment. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteAppointment = async (appointmentId) => {
+    const appointment = appointments.find(a => a.id === appointmentId);
+    const confirmed = await showDeleteConfirm(
+      appointment ? `${appointment.customerName} - ${appointment.service}` : 'this appointment',
+      'appointment'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      setLoading(true);
+      await apiService.deleteAppointment(appointmentId);
+      showSuccess('Appointment deleted successfully');
+      await loadAppointments();
+    } catch (err) {
+      console.error('Error deleting appointment:', err);
+      showError(err.message || 'Failed to delete appointment. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -139,13 +225,15 @@ const Appointments = () => {
           <h1 className="text-2xl font-bold text-gray-900">Appointments</h1>
           <p className="text-gray-600">Schedule and manage customer appointments</p>
         </div>
-        <button
-          onClick={() => setShowNewAppointmentModal(true)}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Schedule Appointment</span>
-        </button>
+        {hasPermission(user, 'appointments.create') && (
+          <button
+            onClick={() => setShowNewAppointmentModal(true)}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Plus className="h-5 w-5" />
+            <span>New Appointment</span>
+          </button>
+        )}
       </div>
 
       {/* Status Overview */}
@@ -159,16 +247,16 @@ const Appointments = () => {
           <div className="text-sm text-gray-600">Pending</div>
         </div>
         <div className="card text-center">
-          <div className="text-2xl font-bold text-green-600">{statusCounts.confirmed}</div>
+          <div className="text-2xl font-bold text-blue-600">{statusCounts.confirmed}</div>
           <div className="text-sm text-gray-600">Confirmed</div>
+        </div>
+        <div className="card text-center">
+          <div className="text-2xl font-bold text-green-600">{statusCounts.completed}</div>
+          <div className="text-sm text-gray-600">Completed</div>
         </div>
         <div className="card text-center">
           <div className="text-2xl font-bold text-red-600">{statusCounts.cancelled}</div>
           <div className="text-sm text-gray-600">Cancelled</div>
-        </div>
-        <div className="card text-center">
-          <div className="text-2xl font-bold text-blue-600">{statusCounts.completed}</div>
-          <div className="text-sm text-gray-600">Completed</div>
         </div>
       </div>
 
@@ -217,119 +305,141 @@ const Appointments = () => {
       </div>
 
       {/* Appointments Table */}
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Appointment ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Customer
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Service
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date & Time
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Staff Member
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Reminder
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredAppointments.map((appointment) => (
-                <tr key={appointment.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <Calendar className="h-5 w-5 text-gray-400 mr-2" />
-                      <span className="text-sm font-medium text-gray-900">{appointment.id}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900">{appointment.customerName}</div>
-                      <div className="text-sm text-gray-500">{appointment.customerEmail}</div>
-                      <div className="text-sm text-gray-500">{appointment.customerPhone}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-900">{appointment.service}</span>
-                    <div className="text-sm text-gray-500">{appointment.duration}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center text-sm text-gray-900">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      {appointment.appointmentDate}
-                    </div>
-                    <div className="flex items-center text-sm text-gray-500">
-                      <Clock className="h-4 w-4 mr-2" />
-                      {appointment.appointmentTime}
-                    </div>
-                    <div className="flex items-center text-sm text-gray-500">
-                      <MapPin className="h-4 w-4 mr-2" />
-                      {appointment.location}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <User className="h-4 w-4 text-gray-400 mr-2" />
-                      <span className="text-sm text-gray-900">{appointment.staffMember}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${appointment.statusColor}`}>
-                      {appointment.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {appointment.reminderSent ? (
-                      <span className="flex items-center text-green-600">
-                        <CheckCircle className="h-4 w-4 mr-1" />
-                        Sent
-                      </span>
-                    ) : (
-                      <span className="flex items-center text-gray-400">
-                        <XCircle className="h-4 w-4 mr-1" />
-                        Not Sent
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      <button className="text-primary-600 hover:text-primary-900">
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button className="text-gray-600 hover:text-gray-900">
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button className="text-red-600 hover:text-red-900">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
+      {error && <div className="card text-red-600">{error}</div>}
+      {loading ? (
+        <div className="card">Loading appointments...</div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Customer
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Service
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date & Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Staff
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredAppointments.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                      {loading ? 'Loading...' : 'No appointments found'}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredAppointments.map((appointment) => (
+                    <tr key={appointment.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <User className="h-5 w-5 text-gray-400 mr-2" />
+                          <div>
+                            <div className="text-sm font-medium text-gray-900">{appointment.customerName}</div>
+                            <div className="text-sm text-gray-500">{appointment.customerEmail}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{appointment.service}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm text-gray-900">
+                          <Calendar className="h-4 w-4 mr-1 text-gray-400" />
+                          {new Date(appointment.appointmentDate).toLocaleDateString()}
+                        </div>
+                        <div className="flex items-center text-sm text-gray-500">
+                          <Clock className="h-4 w-4 mr-1 text-gray-400" />
+                          {appointment.appointmentTime}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {appointment.staffMember || 'Unassigned'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${appointment.statusColor}`}>
+                          {appointment.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          {hasPermission(user, 'appointments.view') && (
+                            <button 
+                              onClick={() => handleViewAppointment(appointment)}
+                              className="text-primary-600 hover:text-primary-900"
+                              title="View appointment details"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                          )}
+                          {hasPermission(user, 'appointments.edit') && (
+                            <button 
+                              onClick={() => handleEditAppointment(appointment)}
+                              className="text-gray-600 hover:text-gray-900"
+                              title="Edit appointment"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                          )}
+                          {hasPermission(user, 'appointments.delete') && (
+                            <button 
+                              onClick={() => handleDeleteAppointment(appointment.id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Delete appointment"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* New Appointment Modal */}
+      {/* Modals */}
       {showNewAppointmentModal && (
         <NewAppointmentModal
           onClose={() => setShowNewAppointmentModal(false)}
+          onSave={handleAddAppointment}
+        />
+      )}
+
+      {showViewModal && selectedAppointment && (
+        <ViewAppointmentModal
+          appointment={selectedAppointment}
+          onClose={() => {
+            setShowViewModal(false);
+            setSelectedAppointment(null);
+          }}
+        />
+      )}
+
+      {showEditModal && selectedAppointment && (
+        <EditAppointmentModal
+          appointment={selectedAppointment}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedAppointment(null);
+          }}
+          onSave={handleSaveAppointment}
         />
       )}
     </div>

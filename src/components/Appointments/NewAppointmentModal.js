@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, User, Calendar, Clock, MapPin, AlertCircle } from 'lucide-react';
+import apiService from '../../services/api';
+import { showError } from '../../utils/toast';
 
-const NewAppointmentModal = ({ onClose }) => {
+const NewAppointmentModal = ({ onClose, onSave }) => {
   const [formData, setFormData] = useState({
     customerId: '',
     service: '',
@@ -15,32 +17,35 @@ const NewAppointmentModal = ({ onClose }) => {
   });
 
   const [errors, setErrors] = useState({});
+  const [customers, setCustomers] = useState([]);
+  const [services, setServices] = useState([]);
+  const [staffMembers, setStaffMembers] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
 
-  // Mock data - replace with API calls
-  const customers = [
-    { id: '1', name: 'John Doe', email: 'john@example.com' },
-    { id: '2', name: 'Jane Smith', email: 'jane@example.com' },
-    { id: '3', name: 'Mike Johnson', email: 'mike@example.com' },
-    { id: '4', name: 'Sarah Wilson', email: 'sarah@example.com' }
-  ];
+  // Load customers, services, and staff on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoadingData(true);
+        const [customersRes, servicesRes, staffRes] = await Promise.all([
+          apiService.getCustomers({ limit: 100, page: 1 }),
+          apiService.getServices({ limit: 100, page: 1 }),
+          apiService.getStaff({ limit: 100, page: 1 })
+        ]);
+        
+        setCustomers(customersRes.customers || []);
+        setServices(servicesRes.services || []);
+        setStaffMembers(staffRes.staff || []);
+      } catch (err) {
+        console.error('Error loading data:', err);
+        showError('Failed to load data. Please try again.');
+      } finally {
+        setLoadingData(false);
+      }
+    };
 
-  const services = [
-    'Visa Consultation',
-    'Document Review',
-    'Application Submission',
-    'Follow-up Consultation',
-    'Initial Consultation',
-    'Passport Application',
-    'Birth Certificate',
-    'School Application'
-  ];
-
-  const staffMembers = [
-    { id: '1', name: 'Sarah Wilson' },
-    { id: '2', name: 'Mike Johnson' },
-    { id: '3', name: 'Lisa Davis' },
-    { id: '4', name: 'David Brown' }
-  ];
+    loadData();
+  }, []);
 
   const locations = [
     'Office - Room A',
@@ -93,9 +98,30 @@ const NewAppointmentModal = ({ onClose }) => {
     e.preventDefault();
     
     if (validateForm()) {
-      // Handle form submission - API call will go here
-      console.log('Form submitted:', formData);
-      onClose();
+      // Prepare data for API
+      const selectedCustomer = customers.find(c => String(c.id) === String(formData.customerId));
+      const selectedService = services.find(s => String(s.id) === String(formData.service));
+      const selectedStaff = staffMembers.find(s => String(s.id) === String(formData.staffMember));
+      
+      const appointmentData = {
+        customer_name: selectedCustomer ? `${selectedCustomer.first_name} ${selectedCustomer.last_name}`.trim() : '',
+        customer_email: selectedCustomer ? selectedCustomer.email : '',
+        customer_phone: selectedCustomer ? selectedCustomer.phone || '' : '',
+        service: selectedService ? selectedService.name : formData.service,
+        appointment_date: formData.appointmentDate,
+        appointment_time: formData.appointmentTime,
+        duration: `${formData.duration} minutes`,
+        status: 'pending',
+        staff_member: selectedStaff ? `${selectedStaff.first_name} ${selectedStaff.last_name}`.trim() : '',
+        location: formData.location,
+        notes: formData.notes,
+        reminder_sent: false
+      };
+
+      // Call the onSave prop (which will make the API call)
+      if (onSave) {
+        onSave(appointmentData);
+      }
     }
   };
 
@@ -131,19 +157,25 @@ const NewAppointmentModal = ({ onClose }) => {
                   <label className="label">Customer *</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <select
-                      name="customerId"
-                      value={formData.customerId}
-                      onChange={handleInputChange}
-                      className={`input-field pl-10 ${errors.customerId ? 'border-red-500' : ''}`}
-                    >
-                      <option value="">Select a customer</option>
-                      {customers.map(customer => (
-                        <option key={customer.id} value={customer.id}>
-                          {customer.name} ({customer.email})
-                        </option>
-                      ))}
-                    </select>
+                    {loadingData ? (
+                      <select className="input-field pl-10" disabled>
+                        <option>Loading customers...</option>
+                      </select>
+                    ) : (
+                      <select
+                        name="customerId"
+                        value={formData.customerId}
+                        onChange={handleInputChange}
+                        className={`input-field pl-10 ${errors.customerId ? 'border-red-500' : ''}`}
+                      >
+                        <option value="">Select a customer</option>
+                        {customers.map(customer => (
+                          <option key={customer.id} value={String(customer.id)}>
+                            {customer.first_name} {customer.last_name} ({customer.email})
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   {errors.customerId && (
                     <p className="mt-1 text-sm text-red-600 flex items-center">
@@ -158,19 +190,25 @@ const NewAppointmentModal = ({ onClose }) => {
                   <label className="label">Service *</label>
                   <div className="relative">
                     <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <select
-                      name="service"
-                      value={formData.service}
-                      onChange={handleInputChange}
-                      className={`input-field pl-10 ${errors.service ? 'border-red-500' : ''}`}
-                    >
-                      <option value="">Select a service</option>
-                      {services.map(service => (
-                        <option key={service} value={service}>
-                          {service}
-                        </option>
-                      ))}
-                    </select>
+                    {loadingData ? (
+                      <select className="input-field pl-10" disabled>
+                        <option>Loading services...</option>
+                      </select>
+                    ) : (
+                      <select
+                        name="service"
+                        value={formData.service}
+                        onChange={handleInputChange}
+                        className={`input-field pl-10 ${errors.service ? 'border-red-500' : ''}`}
+                      >
+                        <option value="">Select a service</option>
+                        {services.map(service => (
+                          <option key={service.id} value={String(service.id)}>
+                            {service.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   {errors.service && (
                     <p className="mt-1 text-sm text-red-600 flex items-center">
@@ -270,19 +308,25 @@ const NewAppointmentModal = ({ onClose }) => {
                   <label className="label">Assign to Staff Member *</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <select
-                      name="staffMember"
-                      value={formData.staffMember}
-                      onChange={handleInputChange}
-                      className={`input-field pl-10 ${errors.staffMember ? 'border-red-500' : ''}`}
-                    >
-                      <option value="">Select staff member</option>
-                      {staffMembers.map(staff => (
-                        <option key={staff.id} value={staff.id}>
-                          {staff.name}
-                        </option>
-                      ))}
-                    </select>
+                    {loadingData ? (
+                      <select className="input-field pl-10" disabled>
+                        <option>Loading staff...</option>
+                      </select>
+                    ) : (
+                      <select
+                        name="staffMember"
+                        value={formData.staffMember}
+                        onChange={handleInputChange}
+                        className={`input-field pl-10 ${errors.staffMember ? 'border-red-500' : ''}`}
+                      >
+                        <option value="">Select staff member</option>
+                        {staffMembers.map(staff => (
+                          <option key={staff.id} value={String(staff.id)}>
+                            {staff.first_name} {staff.last_name} - {staff.position}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   {errors.staffMember && (
                     <p className="mt-1 text-sm text-red-600 flex items-center">
@@ -344,4 +388,5 @@ const NewAppointmentModal = ({ onClose }) => {
 };
 
 export default NewAppointmentModal;
+
 

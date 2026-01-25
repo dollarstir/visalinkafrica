@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, User, Mail, Phone, MapPin, AlertCircle } from 'lucide-react';
+import { showError } from '../../utils/toast';
 
 const EditCustomerModal = ({ customer, onClose, onSave }) => {
   const [formData, setFormData] = useState({
@@ -8,16 +9,18 @@ const EditCustomerModal = ({ customer, onClose, onSave }) => {
     email: '',
     phone: '',
     address: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    country: '',
     dateOfBirth: '',
+    nationality: '',
+    passportNumber: '',
     gender: '',
     occupation: '',
+    city: '',
+    state: '',
+    country: '',
     emergencyContact: '',
     emergencyPhone: '',
-    notes: ''
+    notes: '',
+    status: 'active'
   });
 
   const [errors, setErrors] = useState({});
@@ -40,24 +43,40 @@ const EditCustomerModal = ({ customer, onClose, onSave }) => {
     { value: 'ZA', label: 'South Africa' }
   ];
 
+  const statusOptions = [
+    { value: 'active', label: 'Active' },
+    { value: 'inactive', label: 'Inactive' },
+    { value: 'suspended', label: 'Suspended' }
+  ];
+
   useEffect(() => {
     if (customer) {
+      // Format date_of_birth to YYYY-MM-DD for date input
+      const formatDate = (dateStr) => {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        if (isNaN(date.getTime())) return '';
+        return date.toISOString().split('T')[0];
+      };
+      
       setFormData({
         firstName: customer.firstName || '',
         lastName: customer.lastName || '',
         email: customer.email || '',
         phone: customer.phone || '',
         address: customer.address || '',
-        city: customer.city || '',
-        state: customer.state || '',
-        zipCode: customer.zipCode || '',
-        country: customer.country || '',
-        dateOfBirth: customer.dateOfBirth || '',
+        dateOfBirth: formatDate(customer.dateOfBirth),
+        nationality: customer.nationality || '',
+        passportNumber: customer.passportNumber || '',
         gender: customer.gender || '',
         occupation: customer.occupation || '',
+        city: customer.city || '',
+        state: customer.state || '',
+        country: customer.country || '',
         emergencyContact: customer.emergencyContact || '',
         emergencyPhone: customer.emergencyPhone || '',
-        notes: customer.notes || ''
+        notes: customer.notes || '',
+        status: customer.status ? customer.status.toLowerCase() : 'active'
       });
     }
   }, [customer]);
@@ -103,12 +122,16 @@ const EditCustomerModal = ({ customer, onClose, onSave }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (validateForm()) {
-      onSave({ ...customer, ...formData });
-      onClose();
+      try {
+        await onSave({ ...customer, ...formData });
+        onClose();
+      } catch (err) {
+        showError(err?.message || 'Failed to save customer');
+      }
     }
   };
 
@@ -232,19 +255,19 @@ const EditCustomerModal = ({ customer, onClose, onSave }) => {
                 <div>
                   <label className="label">Address</label>
                   <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <input
-                      type="text"
+                    <MapPin className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                    <textarea
                       name="address"
                       value={formData.address}
                       onChange={handleInputChange}
+                      rows={3}
                       className="input-field pl-10"
-                      placeholder="Enter street address"
+                      placeholder="Enter full address"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="label">City</label>
                     <input
@@ -266,18 +289,6 @@ const EditCustomerModal = ({ customer, onClose, onSave }) => {
                       onChange={handleInputChange}
                       className="input-field"
                       placeholder="Enter state"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="label">ZIP/Postal Code</label>
-                    <input
-                      type="text"
-                      name="zipCode"
-                      value={formData.zipCode}
-                      onChange={handleInputChange}
-                      className="input-field"
-                      placeholder="Enter ZIP code"
                     />
                   </div>
                 </div>
@@ -313,6 +324,32 @@ const EditCustomerModal = ({ customer, onClose, onSave }) => {
                   </div>
 
                   <div>
+                    <label className="label">Nationality</label>
+                    <input
+                      type="text"
+                      name="nationality"
+                      value={formData.nationality}
+                      onChange={handleInputChange}
+                      className="input-field"
+                      placeholder="Enter nationality"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="label">Passport Number</label>
+                  <input
+                    type="text"
+                    name="passportNumber"
+                    value={formData.passportNumber}
+                    onChange={handleInputChange}
+                    className="input-field"
+                    placeholder="Enter passport number"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
                     <label className="label">Gender</label>
                     <select
                       name="gender"
@@ -328,18 +365,18 @@ const EditCustomerModal = ({ customer, onClose, onSave }) => {
                       ))}
                     </select>
                   </div>
-                </div>
 
-                <div>
-                  <label className="label">Occupation</label>
-                  <input
-                    type="text"
-                    name="occupation"
-                    value={formData.occupation}
-                    onChange={handleInputChange}
-                    className="input-field"
-                    placeholder="Enter occupation"
-                  />
+                  <div>
+                    <label className="label">Occupation</label>
+                    <input
+                      type="text"
+                      name="occupation"
+                      value={formData.occupation}
+                      onChange={handleInputChange}
+                      className="input-field"
+                      placeholder="Enter occupation"
+                    />
+                  </div>
                 </div>
 
                 {/* Emergency Contact */}
@@ -370,6 +407,23 @@ const EditCustomerModal = ({ customer, onClose, onSave }) => {
                       />
                     </div>
                   </div>
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="label">Status *</label>
+                  <select
+                    name="status"
+                    value={formData.status}
+                    onChange={handleInputChange}
+                    className="input-field"
+                  >
+                    {statusOptions.map(status => (
+                      <option key={status.value} value={status.value}>
+                        {status.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Notes */}
@@ -410,4 +464,8 @@ const EditCustomerModal = ({ customer, onClose, onSave }) => {
 };
 
 export default EditCustomerModal;
+
+
+
+
 

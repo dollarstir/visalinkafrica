@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, User, Mail, Phone, MapPin, Calendar, DollarSign, Briefcase, AlertCircle } from 'lucide-react';
+import { X, User, Mail, Phone, MapPin, Calendar, DollarSign, Briefcase, AlertCircle, Lock } from 'lucide-react';
+import { showError } from '../../utils/toast';
 
-const NewStaffModal = ({ onClose }) => {
+const NewStaffModal = ({ onClose, onSave }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -16,7 +17,10 @@ const NewStaffModal = ({ onClose }) => {
     location: 'Main Office',
     emergencyContact: '',
     emergencyPhone: '',
-    notes: ''
+    notes: '',
+    createUserAccount: false,
+    password: '',
+    confirmPassword: ''
   });
 
   const [errors, setErrors] = useState({});
@@ -107,17 +111,53 @@ const NewStaffModal = ({ onClose }) => {
       newErrors.salary = 'Salary is required';
     }
 
+    // Validate password if creating user account
+    if (formData.createUserAccount) {
+      if (!formData.password) {
+        newErrors.password = 'Password is required';
+      } else if (formData.password.length < 6) {
+        newErrors.password = 'Password must be at least 6 characters';
+      }
+
+      if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = 'Passwords do not match';
+      }
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (validateForm()) {
-      // Handle form submission - API call will go here
-      console.log('Form submitted:', formData);
-      onClose();
+      try {
+        // Prepare data for API
+        const staffData = {
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          email: formData.email,
+          phone: formData.phone,
+          position: formData.position,
+          department: formData.department,
+          hire_date: formData.hireDate,
+          salary: formData.salary,
+          status: 'active',
+          location: formData.location,
+          working_hours: formData.workingHours,
+          total_applications: 0,
+          current_workload: 'low',
+          create_user_account: formData.createUserAccount,
+          password: formData.createUserAccount ? formData.password : undefined
+        };
+
+        if (onSave) {
+          await onSave(staffData);
+        }
+      } catch (err) {
+        showError(err.message || 'Failed to add staff member');
+      }
     }
   };
 
@@ -324,7 +364,7 @@ const NewStaffModal = ({ onClose }) => {
                           value={formData.salary}
                           onChange={handleInputChange}
                           className={`input-field pl-10 ${errors.salary ? 'border-red-500' : ''}`}
-                          placeholder="e.g., $50,000"
+                          placeholder="e.g., 50000"
                         />
                       </div>
                       {errors.salary && (
@@ -442,6 +482,83 @@ const NewStaffModal = ({ onClose }) => {
                     placeholder="Additional notes about the staff member..."
                   />
                 </div>
+
+                {/* User Account Creation */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">User Account</h4>
+                  <div className="flex items-center mb-4">
+                    <input
+                      type="checkbox"
+                      name="createUserAccount"
+                      checked={formData.createUserAccount}
+                      onChange={(e) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          createUserAccount: e.target.checked,
+                          password: e.target.checked ? prev.password : '',
+                          confirmPassword: e.target.checked ? prev.confirmPassword : ''
+                        }));
+                        if (!e.target.checked) {
+                          setErrors(prev => ({
+                            ...prev,
+                            password: '',
+                            confirmPassword: ''
+                          }));
+                        }
+                      }}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                    />
+                    <label className="ml-2 block text-sm text-gray-900 dark:text-gray-200">
+                      Create user account for login
+                    </label>
+                  </div>
+
+                  {formData.createUserAccount && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <label className="label">Password *</label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-gray-500" />
+                          <input
+                            type="password"
+                            name="password"
+                            value={formData.password}
+                            onChange={handleInputChange}
+                            className={`input-field pl-10 ${errors.password ? 'border-red-500' : ''}`}
+                            placeholder="Enter password (min 6 characters)"
+                          />
+                        </div>
+                        {errors.password && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center">
+                            <AlertCircle className="h-4 w-4 mr-1" />
+                            {errors.password}
+                          </p>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="label">Confirm Password *</label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 dark:text-gray-500" />
+                          <input
+                            type="password"
+                            name="confirmPassword"
+                            value={formData.confirmPassword}
+                            onChange={handleInputChange}
+                            className={`input-field pl-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+                            placeholder="Confirm password"
+                          />
+                        </div>
+                        {errors.confirmPassword && (
+                          <p className="mt-1 text-sm text-red-600 dark:text-red-400 flex items-center">
+                            <AlertCircle className="h-4 w-4 mr-1" />
+                            {errors.confirmPassword}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -468,4 +585,9 @@ const NewStaffModal = ({ onClose }) => {
 };
 
 export default NewStaffModal;
+
+
+
+
+
 

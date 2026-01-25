@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { X, Settings, FolderOpen, DollarSign, Clock, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Settings, FolderOpen, Coins, Clock, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import apiService from '../../services/api';
+import { showError } from '../../utils/toast';
 
-const NewServiceModal = ({ onClose }) => {
+const NewServiceModal = ({ onClose, onSave }) => {
   const [formData, setFormData] = useState({
     name: '',
     categoryId: '',
@@ -14,14 +16,29 @@ const NewServiceModal = ({ onClose }) => {
   });
 
   const [errors, setErrors] = useState({});
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
 
-  // Mock data - replace with API calls
-  const categories = [
-    { id: 'CAT-001', name: 'Document' },
-    { id: 'CAT-002', name: 'Education' },
-    { id: 'CAT-003', name: 'Travel' },
-    { id: 'CAT-004', name: 'Business' }
-  ];
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      setLoadingCategories(true);
+      const response = await apiService.getServiceCategories({ page: 1, limit: 100 });
+      const categoryOptions = (response.categories || []).map(cat => ({
+        id: cat.id.toString(),
+        name: cat.name
+      }));
+      setCategories(categoryOptions);
+    } catch (err) {
+      console.error('Error loading categories:', err);
+      showError('Failed to load categories');
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -159,19 +176,35 @@ const NewServiceModal = ({ onClose }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (validateForm()) {
       // Filter out empty requirements
       const validRequirements = formData.requirements.filter(req => req.trim() !== '');
+      
+      // Format pricing tiers for API
+      const pricingTiers = formData.pricingTiers
+        .filter(tier => tier.name.trim() && tier.price.trim() && tier.duration.trim())
+        .map(tier => ({
+          name: tier.name.trim(),
+          price: tier.price.trim().replace(/[^0-9.]/g, ''), // Remove any currency symbols
+          duration: tier.duration.trim(),
+          isDefault: tier.isDefault || false
+        }));
+
       const submitData = {
-        ...formData,
-        requirements: validRequirements
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        category_id: formData.categoryId ? parseInt(formData.categoryId) : null,
+        pricing_tiers: pricingTiers.length > 0 ? pricingTiers : null,
+        requirements: validRequirements.length > 0 ? validRequirements : [],
+        is_active: formData.isActive !== false
       };
       
-      // Handle form submission - API call will go here
-      console.log('Form submitted:', submitData);
+      if (onSave) {
+        await onSave(submitData);
+      }
       onClose();
     }
   };
@@ -325,13 +358,13 @@ const NewServiceModal = ({ onClose }) => {
                           <div>
                             <label className="label">Price</label>
                             <div className="relative">
-                              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                              <Coins className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                               <input
                                 type="text"
                                 value={tier.price}
                                 onChange={(e) => handlePricingTierChange(index, 'price', e.target.value)}
                                 className={`input-field pl-10 ${errors[`pricingTier_${index}_price`] ? 'border-red-500' : ''}`}
-                                placeholder="e.g., $150.00"
+                                placeholder="e.g., 150.00"
                               />
                             </div>
                             {errors[`pricingTier_${index}_price`] && (

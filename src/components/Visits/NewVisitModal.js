@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, User, Calendar, Clock, MapPin, FileText, AlertCircle } from 'lucide-react';
+import apiService from '../../services/api';
+import { showError } from '../../utils/toast';
 
-const NewVisitModal = ({ onClose }) => {
+const NewVisitModal = ({ onClose, onSave }) => {
   const [formData, setFormData] = useState({
-    customerId: '',
+    visitorId: '',
     visitType: '',
     visitDate: '',
     visitTime: '',
@@ -18,14 +20,32 @@ const NewVisitModal = ({ onClose }) => {
   });
 
   const [errors, setErrors] = useState({});
+  const [visitors, setVisitors] = useState([]);
+  const [staffMembers, setStaffMembers] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
 
-  // Mock data - replace with API calls
-  const customers = [
-    { id: '1', name: 'John Doe', email: 'john@example.com' },
-    { id: '2', name: 'Jane Smith', email: 'jane@example.com' },
-    { id: '3', name: 'Mike Johnson', email: 'mike@example.com' },
-    { id: '4', name: 'Sarah Wilson', email: 'sarah@example.com' }
-  ];
+  // Load visitors and staff on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoadingData(true);
+        const [visitorsRes, staffRes] = await Promise.all([
+          apiService.getVisitors({ limit: 100, page: 1 }),
+          apiService.getStaff({ limit: 100, page: 1 })
+        ]);
+        
+        setVisitors(visitorsRes.visitors || []);
+        setStaffMembers(staffRes.staff || []);
+      } catch (err) {
+        console.error('Error loading data:', err);
+        showError('Failed to load visitors and staff. Please try again.');
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   const visitTypes = [
     'Initial Consultation',
@@ -35,13 +55,6 @@ const NewVisitModal = ({ onClose }) => {
     'Status Update',
     'Payment Processing',
     'Other'
-  ];
-
-  const staffMembers = [
-    { id: '1', name: 'Sarah Wilson' },
-    { id: '2', name: 'Mike Johnson' },
-    { id: '3', name: 'Lisa Davis' },
-    { id: '4', name: 'David Brown' }
   ];
 
   const locations = [
@@ -79,8 +92,8 @@ const NewVisitModal = ({ onClose }) => {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.customerId) {
-      newErrors.customerId = 'Customer is required';
+    if (!formData.visitorId) {
+      newErrors.visitorId = 'Visitor is required';
     }
 
     if (!formData.visitType) {
@@ -130,9 +143,29 @@ const NewVisitModal = ({ onClose }) => {
     e.preventDefault();
     
     if (validateForm()) {
-      // Handle form submission - API call will go here
-      console.log('Form submitted:', formData);
-      onClose();
+      // Prepare data for API
+      const selectedVisitor = visitors.find(v => String(v.id) === String(formData.visitorId));
+      const selectedStaff = staffMembers.find(s => String(s.id) === String(formData.staffMember));
+      
+      const visitData = {
+        customer_name: selectedVisitor ? `${selectedVisitor.first_name} ${selectedVisitor.last_name}`.trim() : '',
+        customer_email: selectedVisitor ? selectedVisitor.email : '',
+        visit_type: formData.visitType,
+        visit_date: formData.visitDate,
+        visit_time: formData.visitTime,
+        duration: formData.duration,
+        staff_member: selectedStaff ? `${selectedStaff.first_name} ${selectedStaff.last_name}`.trim() : '',
+        location: formData.location,
+        purpose: formData.purpose,
+        outcome: formData.outcome,
+        follow_up_required: formData.followUpRequired,
+        notes: formData.notes
+      };
+
+      // Call the onSave prop (which will make the API call)
+      if (onSave) {
+        onSave(visitData);
+      }
     }
   };
 
@@ -166,27 +199,35 @@ const NewVisitModal = ({ onClose }) => {
                 {/* Customer and Visit Type */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="label">Customer *</label>
+                    <label className="label">Visitor *</label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                      <select
-                        name="customerId"
-                        value={formData.customerId}
-                        onChange={handleInputChange}
-                        className={`input-field pl-10 ${errors.customerId ? 'border-red-500' : ''}`}
-                      >
-                        <option value="">Select a customer</option>
-                        {customers.map(customer => (
-                          <option key={customer.id} value={customer.id}>
-                            {customer.name} ({customer.email})
-                          </option>
-                        ))}
-                      </select>
+                      {loadingData ? (
+                        <select className="input-field pl-10" disabled>
+                          <option>Loading visitors...</option>
+                        </select>
+                      ) : (
+                        <>
+                          <select
+                            name="visitorId"
+                            value={formData.visitorId}
+                            onChange={handleInputChange}
+                            className={`input-field pl-10 ${errors.visitorId ? 'border-red-500' : ''}`}
+                          >
+                            <option value="">Select a visitor</option>
+                            {visitors.map(visitor => (
+                              <option key={visitor.id} value={String(visitor.id)}>
+                                {visitor.first_name} {visitor.last_name} ({visitor.email})
+                              </option>
+                            ))}
+                          </select>
+                        </>
+                      )}
                     </div>
-                    {errors.customerId && (
+                    {errors.visitorId && (
                       <p className="mt-1 text-sm text-red-600 flex items-center">
                         <AlertCircle className="h-4 w-4 mr-1" />
-                        {errors.customerId}
+                        {errors.visitorId}
                       </p>
                     )}
                   </div>
@@ -308,19 +349,25 @@ const NewVisitModal = ({ onClose }) => {
                   <label className="label">Assigned Staff Member *</label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <select
-                      name="staffMember"
-                      value={formData.staffMember}
-                      onChange={handleInputChange}
-                      className={`input-field pl-10 ${errors.staffMember ? 'border-red-500' : ''}`}
-                    >
-                      <option value="">Select staff member</option>
-                      {staffMembers.map(staff => (
-                        <option key={staff.id} value={staff.id}>
-                          {staff.name}
-                        </option>
-                      ))}
-                    </select>
+                    {loadingData ? (
+                      <select className="input-field pl-10" disabled>
+                        <option>Loading staff...</option>
+                      </select>
+                    ) : (
+                      <select
+                        name="staffMember"
+                        value={formData.staffMember}
+                        onChange={handleInputChange}
+                        className={`input-field pl-10 ${errors.staffMember ? 'border-red-500' : ''}`}
+                      >
+                        <option value="">Select staff member</option>
+                        {staffMembers.map(staff => (
+                          <option key={staff.id} value={String(staff.id)}>
+                            {staff.first_name} {staff.last_name} - {staff.position}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   {errors.staffMember && (
                     <p className="mt-1 text-sm text-red-600 flex items-center">
@@ -439,4 +486,5 @@ const NewVisitModal = ({ onClose }) => {
 };
 
 export default NewVisitModal;
+
 

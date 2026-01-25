@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -10,57 +10,25 @@ import {
   Clock
 } from 'lucide-react';
 import NewVisitorModal from './NewVisitorModal';
+import ViewVisitorModal from './ViewVisitorModal';
+import EditVisitorModal from './EditVisitorModal';
+import apiService from '../../services/api';
+import { showSuccess, showError, showDeleteConfirm } from '../../utils/toast';
+import { useAuth } from '../Auth/AuthContext';
+import { hasPermission } from '../../utils/permissions';
+import { Navigate } from 'react-router-dom';
 
 const Visitors = () => {
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showNewVisitorModal, setShowNewVisitorModal] = useState(false);
-
-  // Mock data - replace with API calls
-  const visitors = [
-    {
-      id: 'VIS-001',
-      firstName: 'Alice',
-      lastName: 'Johnson',
-      email: 'alice@example.com',
-      phone: '+1 (555) 111-2222',
-      purpose: 'Consultation',
-      visitDate: '2024-01-15',
-      visitTime: '10:00 AM',
-      status: 'Completed',
-      staffMember: 'Sarah Wilson',
-      notes: 'Interested in visa application',
-      statusColor: 'bg-green-100 text-green-800'
-    },
-    {
-      id: 'VIS-002',
-      firstName: 'Bob',
-      lastName: 'Smith',
-      email: 'bob@example.com',
-      phone: '+1 (555) 333-4444',
-      purpose: 'Document Submission',
-      visitDate: '2024-01-14',
-      visitTime: '2:00 PM',
-      status: 'Scheduled',
-      staffMember: 'Mike Johnson',
-      notes: 'Bringing passport documents',
-      statusColor: 'bg-blue-100 text-blue-800'
-    },
-    {
-      id: 'VIS-003',
-      firstName: 'Carol',
-      lastName: 'Davis',
-      email: 'carol@example.com',
-      phone: '+1 (555) 555-6666',
-      purpose: 'Follow-up',
-      visitDate: '2024-01-13',
-      visitTime: '11:30 AM',
-      status: 'No Show',
-      staffMember: 'Lisa Davis',
-      notes: 'Application status inquiry',
-      statusColor: 'bg-red-100 text-red-800'
-    }
-  ];
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedVisitor, setSelectedVisitor] = useState(null);
+  const [visitors, setVisitors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const statusOptions = [
     { value: 'all', label: 'All Status' },
@@ -89,7 +57,122 @@ const Visitors = () => {
     return counts;
   };
 
+  // Load visitors data from API
+  useEffect(() => {
+    loadVisitors();
+  }, []);
+
+  const loadVisitors = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getVisitors();
+      
+      // Transform API data to match component format
+      const transformedVisitors = response.visitors.map(visitor => ({
+        id: visitor.id.toString(),
+        firstName: visitor.first_name,
+        lastName: visitor.last_name,
+        email: visitor.email,
+        phone: visitor.phone,
+        purpose: visitor.purpose,
+        visitDate: new Date(visitor.visit_date).toLocaleDateString(),
+        visitTime: visitor.visit_time,
+        status: visitor.status.charAt(0).toUpperCase() + visitor.status.slice(1).replace('_', ' '),
+        staffMember: visitor.staff_member,
+        notes: visitor.notes,
+        statusColor: getStatusColor(visitor.status)
+      }));
+      
+      setVisitors(transformedVisitors);
+      setError(null);
+    } catch (err) {
+      console.error('Error loading visitors:', err);
+      setError('Failed to load visitors. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status.toLowerCase()) {
+      case 'scheduled':
+        return 'bg-blue-100 text-blue-800';
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'no_show':
+      case 'no-show':
+        return 'bg-red-100 text-red-800';
+      case 'cancelled':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const handleAddVisitor = async (visitorData) => {
+    try {
+      setLoading(true);
+      await apiService.createVisitor(visitorData);
+      showSuccess('Visitor created successfully');
+      await loadVisitors(); // Refresh the list
+      setShowNewVisitorModal(false);
+    } catch (err) {
+      console.error('Error adding visitor:', err);
+      showError(err.message || 'Failed to add visitor. Please try again.');
+      setError(err.message || 'Failed to add visitor. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateVisitor = async (updatedVisitor) => {
+    try {
+      setLoading(true);
+      await apiService.updateVisitor(selectedVisitor.id, updatedVisitor);
+      showSuccess('Visitor updated successfully');
+      await loadVisitors(); // Refresh the list
+      setShowEditModal(false);
+      setSelectedVisitor(null);
+    } catch (err) {
+      console.error('Error updating visitor:', err);
+      showError(err.message || 'Failed to update visitor. Please try again.');
+      setError(err.message || 'Failed to update visitor. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteVisitor = async (visitorId) => {
+    const confirmed = await showDeleteConfirm('this visitor', 'visitor');
+    
+    if (confirmed) {
+      try {
+        setLoading(true);
+        await apiService.deleteVisitor(visitorId);
+        showSuccess('Visitor deleted successfully');
+        await loadVisitors(); // Refresh the list
+      } catch (err) {
+        console.error('Error deleting visitor:', err);
+        showError(err.message || 'Failed to delete visitor. Please try again.');
+        setError(err.message || 'Failed to delete visitor. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   const statusCounts = getStatusCounts();
+
+  const handleViewVisitor = (visitor) => {
+    setSelectedVisitor(visitor);
+    setShowViewModal(true);
+  };
+
+  const handleEditVisitor = (visitor) => {
+    setSelectedVisitor(visitor);
+    setShowEditModal(true);
+  };
+
 
   return (
     <div className="space-y-6">
@@ -99,13 +182,15 @@ const Visitors = () => {
           <h1 className="text-2xl font-bold text-gray-900">Visitors</h1>
           <p className="text-gray-600">Track and manage visitor appointments and walk-ins</p>
         </div>
-        <button
-          onClick={() => setShowNewVisitorModal(true)}
-          className="btn-primary flex items-center space-x-2"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Add Visitor</span>
-        </button>
+        {hasPermission(user, 'visitors.create') && (
+          <button
+            onClick={() => setShowNewVisitorModal(true)}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Add Visitor</span>
+          </button>
+        )}
       </div>
 
       {/* Status Overview */}
@@ -234,13 +319,25 @@ const Visitors = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
-                      <button className="text-primary-600 hover:text-primary-900">
+                      <button 
+                        onClick={() => handleViewVisitor(visitor)}
+                        className="text-primary-600 hover:text-primary-900"
+                        title="View visitor details"
+                      >
                         <Eye className="h-4 w-4" />
                       </button>
-                      <button className="text-gray-600 hover:text-gray-900">
+                      <button 
+                        onClick={() => handleEditVisitor(visitor)}
+                        className="text-gray-600 hover:text-gray-900"
+                        title="Edit visitor"
+                      >
                         <Edit className="h-4 w-4" />
                       </button>
-                      <button className="text-red-600 hover:text-red-900">
+                      <button 
+                        onClick={() => handleDeleteVisitor(visitor.id)}
+                        className="text-red-600 hover:text-red-900"
+                        title="Delete visitor"
+                      >
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
@@ -252,10 +349,32 @@ const Visitors = () => {
         </div>
       </div>
 
-      {/* New Visitor Modal */}
+      {/* Modals */}
       {showNewVisitorModal && (
         <NewVisitorModal
           onClose={() => setShowNewVisitorModal(false)}
+          onSave={handleAddVisitor}
+        />
+      )}
+
+      {showViewModal && selectedVisitor && (
+        <ViewVisitorModal
+          visitor={selectedVisitor}
+          onClose={() => {
+            setShowViewModal(false);
+            setSelectedVisitor(null);
+          }}
+        />
+      )}
+
+      {showEditModal && selectedVisitor && (
+        <EditVisitorModal
+          visitor={selectedVisitor}
+          onClose={() => {
+            setShowEditModal(false);
+            setSelectedVisitor(null);
+          }}
+          onSave={handleUpdateVisitor}
         />
       )}
     </div>
@@ -263,3 +382,5 @@ const Visitors = () => {
 };
 
 export default Visitors;
+
+

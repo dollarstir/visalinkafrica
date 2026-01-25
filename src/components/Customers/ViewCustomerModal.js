@@ -232,3 +232,8 @@ const ViewCustomerModal = ({ customer, onClose }) => {
 
 export default ViewCustomerModal;
 
+
+
+
+
+

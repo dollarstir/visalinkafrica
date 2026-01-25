@@ -1,95 +1,75 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, User, DollarSign, AlertCircle } from 'lucide-react';
+import { X, FileText, User, AlertCircle } from 'lucide-react';
+import apiService from '../../services/api';
+import { showError } from '../../utils/toast';
+import { useAuth } from '../Auth/AuthContext';
 
 const EditApplicationModal = ({ application, onClose, onSave }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
-    customerId: '',
-    serviceCategoryId: '',
-    serviceId: '',
-    servicePricingTier: '',
+    customer_id: '',
+    service_id: '',
+    staff_id: '',
     status: '',
-    priority: 'medium',
+    priority: 'normal',
     notes: '',
-    documents: []
+    estimated_completion_date: '',
+    actual_completion_date: ''
   });
 
   const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [customers, setCustomers] = useState([]);
+  const [services, setServices] = useState([]);
+  const [staff, setStaff] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
 
-  // Mock data - replace with API calls
-  const customers = [
-    { id: '1', name: 'John Doe', email: 'john@example.com' },
-    { id: '2', name: 'Jane Smith', email: 'jane@example.com' },
-    { id: '3', name: 'Mike Johnson', email: 'mike@example.com' }
-  ];
-
-  const serviceCategories = [
-    {
-      id: '1',
-      name: 'Document Services',
-      services: [
-        {
-          id: '1',
-          name: 'Birth Certificate',
-          pricingTiers: [
-            { id: 'regular', name: 'Regular', price: 150, duration: '7-10 days', isDefault: true },
-            { id: 'express', name: 'Express', price: 250, duration: '3-5 days', isDefault: false }
-          ]
-        },
-        {
-          id: '2',
-          name: 'Passport Application',
-          pricingTiers: [
-            { id: 'regular', name: 'Regular', price: 200, duration: '14-21 days', isDefault: true },
-            { id: 'express', name: 'Express', price: 350, duration: '7-10 days', isDefault: false }
-          ]
-        }
-      ]
-    },
-    {
-      id: '2',
-      name: 'Travel Services',
-      services: [
-        {
-          id: '3',
-          name: 'Visa Application',
-          pricingTiers: [
-            { id: 'standard', name: 'Standard', price: 300, duration: '15-30 days', isDefault: true }
-          ]
-        }
-      ]
-    }
-  ];
-
-  const statusOptions = [
-    { value: 'draft', label: 'Draft' },
-    { value: 'pending', label: 'Pending' },
-    { value: 'submitted', label: 'Submitted' },
-    { value: 'in_progress', label: 'In Progress' },
-    { value: 'completed', label: 'Completed' },
-    { value: 'rejected', label: 'Rejected' },
-    { value: 'cancelled', label: 'Cancelled' }
-  ];
-
-  const priorityOptions = [
-    { value: 'low', label: 'Low' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'high', label: 'High' },
-    { value: 'urgent', label: 'Urgent' }
-  ];
-
+  // Load dropdown data and populate form
   useEffect(() => {
-    if (application) {
-      setFormData({
-        customerId: application.customerId || '',
-        serviceCategoryId: application.serviceCategoryId || '',
-        serviceId: application.serviceId || '',
-        servicePricingTier: application.servicePricingTier || '',
-        status: application.status || '',
-        priority: application.priority || 'medium',
-        notes: application.notes || '',
-        documents: application.documents || []
-      });
-    }
+    const loadData = async () => {
+      try {
+        setLoadingData(true);
+        const [customersRes, servicesRes, staffRes] = await Promise.all([
+          apiService.getCustomers({ page: 1, limit: 100 }),
+          apiService.getServices({ page: 1, limit: 100 }),
+          apiService.getStaff({ page: 1, limit: 100 })
+        ]);
+
+        setCustomers(customersRes.customers || []);
+        setServices(servicesRes.services || []);
+        setStaff(staffRes.staff || []);
+
+        // Populate form with application data
+        if (application) {
+          const formDataToSet = {
+            customer_id: application.customer_id ? String(application.customer_id) : '',
+            service_id: application.service_id ? String(application.service_id) : '',
+            staff_id: application.staff_id ? String(application.staff_id) : '',
+            status: application.status || 'draft',
+            priority: application.priority || 'normal',
+            notes: application.notes || '',
+            estimated_completion_date: application.estimated_completion_date ? 
+              new Date(application.estimated_completion_date).toISOString().split('T')[0] : '',
+            actual_completion_date: application.actual_completion_date ? 
+              new Date(application.actual_completion_date).toISOString().split('T')[0] : ''
+          };
+          
+          console.log('Populating EditApplicationModal form with:', formDataToSet);
+          console.log('Available customers:', customersRes.customers?.length || 0);
+          console.log('Available services:', servicesRes.services?.length || 0);
+          console.log('Available staff:', staffRes.staff?.length || 0);
+          
+          setFormData(formDataToSet);
+        }
+      } catch (err) {
+        console.error('Error loading data:', err);
+        showError('Failed to load data. Please try again.');
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    loadData();
   }, [application]);
 
   const handleInputChange = (e) => {
@@ -106,39 +86,25 @@ const EditApplicationModal = ({ application, onClose, onSave }) => {
         [name]: ''
       }));
     }
-
-    // Auto-select default pricing tier when service changes
-    if (name === 'serviceId') {
-      const selectedCategory = serviceCategories.find(cat => cat.id === formData.serviceCategoryId);
-      const selectedService = selectedCategory?.services.find(service => service.id === value);
-      if (selectedService && selectedService.pricingTiers.length > 0) {
-        const defaultTier = selectedService.pricingTiers.find(tier => tier.isDefault);
-        if (defaultTier) {
-          setFormData(prev => ({
-            ...prev,
-            servicePricingTier: defaultTier.id
-          }));
-        }
-      }
-    }
   };
 
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.customerId) {
-      newErrors.customerId = 'Customer is required';
+    if (!formData.customer_id) {
+      newErrors.customer_id = 'Customer is required';
     }
 
-    if (!formData.serviceCategoryId) {
-      newErrors.serviceCategoryId = 'Service category is required';
+    if (!formData.service_id) {
+      newErrors.service_id = 'Service is required';
     }
 
-    if (!formData.serviceId) {
-      newErrors.serviceId = 'Service is required';
+    if (!formData.staff_id) {
+      newErrors.staff_id = 'Staff member is required';
     }
 
-    if (!formData.status) {
+    // Only non-agent roles are required to choose status
+    if (user?.role !== 'agent' && !formData.status) {
       newErrors.status = 'Status is required';
     }
 
@@ -146,17 +112,60 @@ const EditApplicationModal = ({ application, onClose, onSave }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (validateForm()) {
-      onSave({ ...application, ...formData });
+    if (!validateForm()) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      
+      // Prepare data for API
+      const applicationData = {
+        customer_id: parseInt(formData.customer_id),
+        service_id: parseInt(formData.service_id),
+        staff_id: formData.staff_id ? parseInt(formData.staff_id) : null,
+        // Agents cannot change status or estimated completion date on update
+        status: user?.role === 'agent' ? application.status : formData.status,
+        priority: formData.priority.toLowerCase(),
+        notes: formData.notes || null,
+        estimated_completion_date: user?.role === 'agent'
+          ? application.estimated_completion_date
+          : (formData.estimated_completion_date || null),
+        actual_completion_date: formData.actual_completion_date || null
+      };
+
+      await onSave(applicationData);
       onClose();
+    } catch (err) {
+      console.error('Error updating application:', err);
+      // Error is handled by parent component
+    } finally {
+      setLoading(false);
     }
   };
 
-  const selectedCategory = serviceCategories.find(cat => cat.id === formData.serviceCategoryId);
-  const selectedService = selectedCategory?.services.find(service => service.id === formData.serviceId);
+  const statusOptions = [
+    { value: 'draft', label: 'Draft' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'submitted', label: 'Submitted' },
+    { value: 'under_review', label: 'Under Review' },
+    { value: 'approved', label: 'Approved' },
+    { value: 'rejected', label: 'Rejected' }
+  ];
+
+  const priorityOptions = [
+    { value: 'low', label: 'Low' },
+    { value: 'normal', label: 'Normal' },
+    { value: 'high', label: 'High' },
+    { value: 'urgent', label: 'Urgent' }
+  ];
+
+  const selectedCustomer = customers.find(c => String(c.id) === String(formData.customer_id));
+  const selectedService = services.find(s => String(s.id) === String(formData.service_id));
+  const selectedStaff = staff.find(s => String(s.id) === String(formData.staff_id));
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
@@ -184,157 +193,139 @@ const EditApplicationModal = ({ application, onClose, onSave }) => {
                 </button>
               </div>
 
-              <div className="space-y-4">
-                {/* Customer Selection */}
-                <div>
-                  <label className="label">Customer *</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <select
-                      name="customerId"
-                      value={formData.customerId}
-                      onChange={handleInputChange}
-                      className={`input-field pl-10 ${errors.customerId ? 'border-red-500' : ''}`}
-                    >
-                      <option value="">Select a customer</option>
-                      {customers.map(customer => (
-                        <option key={customer.id} value={customer.id}>
-                          {customer.name} ({customer.email})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {errors.customerId && (
-                    <p className="mt-1 text-sm text-red-600 flex items-center">
-                      <AlertCircle className="h-4 w-4 mr-1" />
-                      {errors.customerId}
-                    </p>
-                  )}
+              {loadingData ? (
+                <div className="text-center py-8">
+                  <div className="text-gray-500">Loading data...</div>
                 </div>
-
-                {/* Service Category and Service */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              ) : (
+                <div className="space-y-4">
+                  {/* Customer Selection */}
                   <div>
-                    <label className="label">Service Category *</label>
+                    <label className="label">Customer *</label>
                     <div className="relative">
-                      <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                       <select
-                        name="serviceCategoryId"
-                        value={formData.serviceCategoryId}
+                        name="customer_id"
+                        value={formData.customer_id}
                         onChange={handleInputChange}
-                        className={`input-field pl-10 ${errors.serviceCategoryId ? 'border-red-500' : ''}`}
+                        className={`input-field pl-10 ${errors.customer_id ? 'border-red-500' : ''}`}
                       >
-                        <option value="">Select category</option>
-                        {serviceCategories.map(category => (
-                          <option key={category.id} value={category.id}>
-                            {category.name}
+                        <option value="">Select a customer</option>
+                        {customers.map(customer => (
+                          <option key={customer.id} value={String(customer.id)}>
+                            {customer.first_name} {customer.last_name} ({customer.email})
                           </option>
                         ))}
                       </select>
                     </div>
-                    {errors.serviceCategoryId && (
+                    {errors.customer_id && (
                       <p className="mt-1 text-sm text-red-600 flex items-center">
                         <AlertCircle className="h-4 w-4 mr-1" />
-                        {errors.serviceCategoryId}
+                        {errors.customer_id}
                       </p>
                     )}
                   </div>
 
+                  {/* Service Selection */}
                   <div>
                     <label className="label">Service *</label>
                     <div className="relative">
                       <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                       <select
-                        name="serviceId"
-                        value={formData.serviceId}
+                        name="service_id"
+                        value={formData.service_id}
                         onChange={handleInputChange}
-                        className={`input-field pl-10 ${errors.serviceId ? 'border-red-500' : ''}`}
-                        disabled={!formData.serviceCategoryId}
+                        className={`input-field pl-10 ${errors.service_id ? 'border-red-500' : ''}`}
                       >
                         <option value="">Select service</option>
-                        {selectedCategory?.services.map(service => (
-                          <option key={service.id} value={service.id}>
+                        {services.map(service => (
+                          <option key={service.id} value={String(service.id)}>
                             {service.name}
                           </option>
                         ))}
                       </select>
                     </div>
-                    {errors.serviceId && (
+                    {errors.service_id && (
                       <p className="mt-1 text-sm text-red-600 flex items-center">
                         <AlertCircle className="h-4 w-4 mr-1" />
-                        {errors.serviceId}
+                        {errors.service_id}
                       </p>
                     )}
+                    {selectedService && (
+                      <p className="mt-1 text-sm text-gray-500">{selectedService.description}</p>
+                    )}
                   </div>
-                </div>
 
-                {/* Service Pricing Tier */}
-                {selectedService && selectedService.pricingTiers.length > 0 && (
+                  {/* Staff Assignment */}
                   <div>
-                    <label className="label">Pricing Tier *</label>
-                    <div className="space-y-2">
-                      {selectedService.pricingTiers.map(tier => (
-                        <label key={tier.id} className="flex items-center p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="servicePricingTier"
-                            value={tier.id}
-                            checked={formData.servicePricingTier === tier.id}
-                            onChange={handleInputChange}
-                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
-                          />
-                          <div className="ml-3 flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-medium text-gray-900">{tier.name}</span>
-                              <div className="flex items-center space-x-4">
-                                <span className="text-sm text-gray-600">{tier.duration}</span>
-                                <span className="text-sm font-bold text-gray-900">${tier.price}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Status and Priority */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">Status *</label>
+                    <label className="label">Assign To *</label>
                     <div className="relative">
-                      <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                       <select
-                        name="status"
-                        value={formData.status}
+                        name="staff_id"
+                        value={formData.staff_id}
                         onChange={handleInputChange}
-                        className={`input-field pl-10 ${errors.status ? 'border-red-500' : ''}`}
+                        className={`input-field pl-10 ${errors.staff_id ? 'border-red-500' : ''}`}
                       >
-                        <option value="">Select status</option>
-                        {statusOptions.map(status => (
-                          <option key={status.value} value={status.value}>
-                            {status.label}
+                        <option value="">Select staff member</option>
+                        {staff.map(member => (
+                          <option key={member.id} value={String(member.id)}>
+                            {member.first_name} {member.last_name} - {member.position}
                           </option>
                         ))}
                       </select>
                     </div>
-                    {errors.status && (
+                    {errors.staff_id && (
                       <p className="mt-1 text-sm text-red-600 flex items-center">
                         <AlertCircle className="h-4 w-4 mr-1" />
-                        {errors.status}
+                        {errors.staff_id}
                       </p>
                     )}
                   </div>
 
-                  <div>
-                    <label className="label">Priority</label>
-                    <div className="relative">
-                      <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  {/* Status and Priority */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">
+                        Status {user?.role !== 'agent' && <span className="text-red-500">*</span>}
+                      </label>
+                      <div className="relative">
+                        <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                        <select
+                          name="status"
+                          value={formData.status}
+                          onChange={handleInputChange}
+                          className={`input-field pl-10 ${errors.status ? 'border-red-500' : ''}`}
+                          disabled={user?.role === 'agent'}
+                        >
+                          <option value="">Select status</option>
+                          {statusOptions.map(status => (
+                            <option key={status.value} value={status.value}>
+                              {status.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {errors.status && user?.role !== 'agent' && (
+                        <p className="mt-1 text-sm text-red-600 flex items-center">
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          {errors.status}
+                        </p>
+                      )}
+                      {user?.role === 'agent' && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          Status is managed by admin or staff. You cannot change it.
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="label">Priority</label>
                       <select
                         name="priority"
                         value={formData.priority}
                         onChange={handleInputChange}
-                        className="input-field pl-10"
+                        className="input-field"
                       >
                         {priorityOptions.map(priority => (
                           <option key={priority.value} value={priority.value}>
@@ -344,34 +335,68 @@ const EditApplicationModal = ({ application, onClose, onSave }) => {
                       </select>
                     </div>
                   </div>
-                </div>
 
-                {/* Notes */}
-                <div>
-                  <label className="label">Notes</label>
-                  <textarea
-                    name="notes"
-                    value={formData.notes}
-                    onChange={handleInputChange}
-                    rows={4}
-                    className="input-field"
-                    placeholder="Additional notes about this application..."
-                  />
+                  {/* Completion Dates */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Estimated Completion Date</label>
+                      <input
+                        type="date"
+                        name="estimated_completion_date"
+                        value={formData.estimated_completion_date}
+                        onChange={handleInputChange}
+                        className="input-field"
+                        disabled={user?.role === 'agent'}
+                      />
+                      {user?.role === 'agent' && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          Estimated completion is managed internally by staff. You cannot change it.
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="label">Actual Completion Date</label>
+                      <input
+                        type="date"
+                        name="actual_completion_date"
+                        value={formData.actual_completion_date}
+                        onChange={handleInputChange}
+                        className="input-field"
+                        disabled={user?.role === 'agent'}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className="label">Notes</label>
+                    <textarea
+                      name="notes"
+                      value={formData.notes}
+                      onChange={handleInputChange}
+                      rows={4}
+                      className="input-field"
+                      placeholder="Additional notes about this application..."
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
               <button
                 type="submit"
-                className="btn-primary w-full sm:w-auto sm:ml-3"
+                disabled={loading || loadingData}
+                className="btn-primary w-full sm:w-auto sm:ml-3 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save Changes
+                {loading ? 'Saving...' : 'Save Changes'}
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                className="btn-secondary w-full sm:w-auto mt-3 sm:mt-0"
+                disabled={loading}
+                className="btn-secondary w-full sm:w-auto mt-3 sm:mt-0 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -384,4 +409,3 @@ const EditApplicationModal = ({ application, onClose, onSave }) => {
 };
 
 export default EditApplicationModal;
-
