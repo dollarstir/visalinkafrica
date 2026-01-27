@@ -131,6 +131,21 @@ app.use('/api/reports', require('./routes/reports'));
 app.use('/api/documents', require('./routes/documents'));
 app.use('/api/settings', require('./routes/settings'));
 
+// Auto-run database migrations on startup (production only)
+const runMigrationsOnStartup = async () => {
+  if (process.env.NODE_ENV === 'production' || process.env.AUTO_MIGRATE === 'true') {
+    try {
+      console.log('Running database migrations...');
+      const { createTables } = require('./scripts/migrate');
+      await createTables();
+      console.log('Database migrations completed successfully!');
+    } catch (error) {
+      console.error('Database migration failed:', error);
+      // Don't exit - let the server start anyway, but log the error
+    }
+  }
+};
+
 // Initialize settings service on startup
 const settingsService = require('./services/settingsService');
 settingsService.initialize().catch(err => {
@@ -160,9 +175,17 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`WebSocket server initialized`);
-});
+// Start server with auto-migration
+const startServer = async () => {
+  // Run migrations before starting server
+  await runMigrationsOnStartup();
+  
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`WebSocket server initialized`);
+  });
+};
+
+startServer();
 
