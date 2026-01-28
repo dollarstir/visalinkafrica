@@ -334,81 +334,113 @@ const Staff = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredStaff.map((member) => (
-          <div key={member.id} className="card hover- shutter-md transition-score"></div>
-
-            <div className="space-y-2 mb-4">
-              <div className="flex items-center text-sm text-gray-600">
-                <Briefcase className="h-4 w-4 mr-2" />
-                {member.position} - {member.department}
-              </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <Mail className="h-4 w-4 mr-2" />
-                {member.email}
-              </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <Phone className="h-4 w-4 mr-2" />
-                {member.phone}
-              </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <MapPin className="h-4 w-4 mr-2" />
-                {member.location}
-              </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <Clock className="h-4 w-4 mr-2" />
-                {member.workingHours}
-              </div>
-              <div className="flex items-center text-sm text-gray-600">
-                <DollarSign className="h-4 w-4 mr-2" />
-                {member.salary}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-              <div>
-                <span className="font-medium">{member.totalApplications}</span> applications
-              </div>
-              <div>
-                Workload: <span className={`font-medium ${
-                  member.currentWorkload === 'High' ? 'text-red-600' :
-                  member.currentWorkload === 'Medium' ? 'text-yellow-600' :
-                  member.currentWorkload === 'Low' ? 'text-green-600' :
-                  'text-gray-600'
-                }`}>
-                  {member.currentWorkload}
+            <div key={member.id} className="card hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center">
+                  <div className="h-12 w-12 rounded-full bg-primary-100 flex items-center justify-center overflow-hidden">
+                    {member.avatar ? (
+                      <img
+                        src={member.avatar}
+                        alt={`${member.firstName} ${member.lastName}`}
+                        className="h-12 w-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-sm font-medium text-primary-700">
+                        {(member.firstName?.charAt(0) || member.lastName?.charAt(0) || '?').toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {member.firstName} {member.lastName}
+                    </h3>
+                    <p className="text-sm text-gray-500">{member.id}</p>
+                  </div>
+                </div>
+                <span className={`px-2 py-1 text-xs font-medium rounded-full ${member.statusColor}`}>
+                  {member.status}
                 </span>
               </div>
-            </div>
 
-            <div className="flex space-x-2">
-              {hasPermission(user, 'staff.view') && (
-                <button 
-                  onClick={() => handleViewStaff(member)}
-                  className="flex-1 btn-outline text-sm"
-                >
-                  <Eye className="h-4 w-4 mr-1" />
-                  View
-                </button>
-              )}
-              {hasPermission(user, 'staff.edit') && (
-                <button 
-                  onClick={() => handleEditStaff(member)}
-                  className="flex-1 btn-secondary text-sm"
-                >
-                  <Edit className="h-4 w-4 mr-1" />
-                  Edit
-                </button>
-              )}
-              {hasPermission(user, 'staff.delete') && (
-                <button 
-                  onClick={() => handleDeleteStaff(member.id)}
-                  className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-200"
-                  title="Delete staff member"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center text-sm text-gray-600">
+                  <Briefcase className="h-4 w-4 mr-2" />
+                  {member.position} - {member.department}
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <Mail className="h-4 w-4 mr-2" />
+                  {member.email}
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <Phone className="h-4 w-4 mr-2" />
+                  {member.phone}
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <MapPin className="h-4 w-4 mr-2" />
+                  {member.location}
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <Clock className="h-4 w-4 mr-2" />
+                  {member.workingHours}
+                </div>
+                <div className="flex items-center text-sm text-gray-600">
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  {member.salary}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                <div>
+                  <span className="font-medium">{member.totalApplications}</span> applications
+                </div>
+                <div>
+                  Workload:{' '}
+                  <span
+                    className={`font-medium ${
+                      member.currentWorkload === 'High'
+                        ? 'text-red-600'
+                        : member.currentWorkload === 'Medium'
+                        ? 'text-yellow-600'
+                        : member.currentWorkload === 'Low'
+                        ? 'text-green-600'
+                        : 'text-gray-600'
+                    }`}
+                  >
+                    {member.currentWorkload}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex space-x-2">
+                {hasPermission(user, 'staff.view') && (
+                  <button
+                    onClick={() => handleViewStaff(member)}
+                    className="flex-1 btn-outline text-sm"
+                  >
+                    <Eye className="h-4 w-4 mr-1" />
+                    View
+                  </button>
+                )}
+                {hasPermission(user, 'staff.edit') && (
+                  <button
+                    onClick={() => handleEditStaff(member)}
+                    className="flex-1 btn-secondary text-sm"
+                  >
+                    <Edit className="h-4 w-4 mr-1" />
+                    Edit
+                  </button>
+                )}
+                {hasPermission(user, 'staff.delete') && (
+                  <button
+                    onClick={() => handleDeleteStaff(member.id)}
+                    className="px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                    title="Delete staff member"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
           ))}
         </div>
       )}
