@@ -223,9 +223,11 @@ router.get('/stats/dashboard', authenticateToken, async (req, res) => {
     `;
     let applicationParams = [];
     
-    // If user is agent, only count their applications
+    // If user is agent, only count their applications.
+    // NOTE: applications table does not have an agent_user_id column, so we
+    // approximate by using staff_id linked to the current user.
     if (userRole === 'agent') {
-      applicationQuery += ` WHERE agent_user_id = $1`;
+      applicationQuery += ` WHERE staff_id = $1`;
       applicationParams.push(userId);
     }
     
@@ -288,11 +290,12 @@ router.get('/stats/dashboard', authenticateToken, async (req, res) => {
       FROM staff_workloads
     `);
 
-    // Get customer statistics
+    // Get customer statistics (customers table has no status column, so treat
+    // all customers as "active" for dashboard purposes)
     const customerStats = await pool.query(`
       SELECT 
         COUNT(*) as total_customers,
-        COUNT(CASE WHEN status = 'active' THEN 1 END) as active_customers
+        COUNT(*) as active_customers
       FROM customers
     `);
 

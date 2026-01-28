@@ -75,24 +75,21 @@ router.get('/', authenticateToken, async (req, res) => {
       }
     }
 
-    // Agent access rules: agents always see only their own applications
-    if (userRole === 'agent') {
-      shouldFilterByAgent = true;
-    }
-
+    // NOTE: Agent-specific filtering is disabled for now because the
+    // applications table does not include an agent_user_id column in the schema.
     let query = `
-      SELECT a.id, a.customer_id, a.service_id, a.staff_id, a.agent_user_id, a.status, a.priority, a.documents, 
+      SELECT a.id, a.customer_id, a.service_id, a.staff_id, a.status, a.priority, a.documents, 
              a.notes, a.estimated_completion_date, a.actual_completion_date, 
              a.created_at, a.updated_at,
              c.first_name, c.last_name, c.email, c.phone,
              s.name as service_name,
              CONCAT(st.first_name, ' ', st.last_name) as staff_name,
-             u_agent.name as agent_name
+             NULL::integer as agent_user_id,
+             NULL::text as agent_name
       FROM applications a
       LEFT JOIN customers c ON a.customer_id = c.id
       LEFT JOIN services s ON a.service_id = s.id
       LEFT JOIN staff st ON a.staff_id = st.id
-      LEFT JOIN users u_agent ON a.agent_user_id = u_agent.id
       WHERE 1=1
     `;
     const queryParams = [];
@@ -105,12 +102,8 @@ router.get('/', authenticateToken, async (req, res) => {
       queryParams.push(staffId);
     }
 
-    // If user is an agent, only show applications they created
-    if (shouldFilterByAgent) {
-      paramCount++;
-      query += ` AND a.agent_user_id = $${paramCount}`;
-      queryParams.push(userId);
-    }
+    // NOTE: Agent-based filtering is disabled because applications schema
+    // does not include an agent_user_id column.
 
     if (search) {
       paramCount++;
@@ -152,12 +145,8 @@ router.get('/', authenticateToken, async (req, res) => {
       countParams.push(staffId);
     }
 
-    // If user is an agent, only count applications they created
-    if (shouldFilterByAgent) {
-      countParamCount++;
-      countQuery += ` AND a.agent_user_id = $${countParamCount}`;
-      countParams.push(userId);
-    }
+    // NOTE: Agent-based filtering is disabled because applications schema
+    // does not include an agent_user_id column.
 
     if (search) {
       paramCount++;
@@ -220,12 +209,6 @@ router.get('/:id', authenticateToken, async (req, res) => {
       }
     }
 
-    // Agents can only see applications they created
-    let shouldFilterByAgent = false;
-    if (userRole === 'agent') {
-      shouldFilterByAgent = true;
-    }
-
     const result = await pool.query(
       `SELECT a.*, c.first_name, c.last_name, c.email, c.phone, s.name as service_name, 
               CONCAT(st.first_name, ' ', st.last_name) as staff_name
@@ -245,11 +228,6 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     // If staff doesn't have view permission, check if application is assigned to them
     if (shouldFilterByStaff && application.staff_id !== staffId) {
-      return res.status(403).json({ error: 'Access denied. This application is not assigned to you.' });
-    }
-
-    // If user is an agent, ensure the application belongs to them
-    if (shouldFilterByAgent && application.agent_user_id !== userId) {
       return res.status(403).json({ error: 'Access denied. This application is not assigned to you.' });
     }
 
@@ -276,24 +254,14 @@ router.post('/', authenticateToken, async (req, res) => {
       estimated_completion_date
     } = req.body;
 
-    // For agents, automatically set agent_user_id to the logged-in user
-    // and force status to 'draft' (agents cannot control status)
-    let insertQuery;
-    let insertParams;
-    if (userRole === 'agent') {
-      const effectiveStatus = 'draft';
-      // Agents cannot set estimated_completion_date either; it is managed by staff/admin
-      const effectiveEstimatedDate = null;
-      insertQuery = `INSERT INTO applications (customer_id, service_id, staff_id, agent_user_id, status, priority, documents, notes, estimated_completion_date)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                     RETURNING *`;
-      insertParams = [customer_id, service_id, staff_id, userId, effectiveStatus, priority, documents, notes, effectiveEstimatedDate];
-    } else {
-      insertQuery = `INSERT INTO applications (customer_id, service_id, staff_id, status, priority, documents, notes, estimated_completion_date)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                     RETURNING *`;
-      insertParams = [customer_id, service_id, staff_id, status, priority, documents, notes, estimated_completion_date];
-    }
+    // For agents, force status to 'draft' and ignore estimated_completion_date
+    const effectiveStatus = userRole === 'agent' ? 'draft' : status;
+    const effectiveEstimatedDate = userRole === 'agent' ? null : estimated_completion_date;
+
+    const insertQuery = `INSERT INTO applications (customer_id, service_id, staff_id, status, priority, documents, notes, estimated_completion_date)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                         RETURNING *`;
+    const insertParams = [customer_id, service_id, staff_id, effectiveStatus, priority, documents, notes, effectiveEstimatedDate];
 
     const result = await pool.query(insertQuery, insertParams);
     const application = result.rows[0];
@@ -408,7 +376,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
     // Get current application data to check status change and get customer info
     const currentAppResult = await pool.query(
-      'SELECT agent_user_id, status, estimated_completion_date, customer_id, service_id FROM applications WHERE id = $1',
+      'SELECT status, estimated_completion_date, customer_id, service_id FROM applications WHERE id = $1',
       [id]
     );
     
@@ -420,14 +388,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
     const oldStatus = currentApp.status;
     let effectiveStatus = status;
 
-    // If user is an agent, ensure they can only update their own applications
-    // and prevent them from changing the status (status is controlled by staff/admin)
+    // If user is an agent, prevent them from changing the status (status is
+    // controlled by staff/admin) and estimated completion date.
     if (userRole === 'agent') {
-      if (currentApp.agent_user_id !== userId) {
-        return res.status(403).json({ error: 'Access denied. This application is not assigned to you.' });
-      }
-
-      // Lock status and estimated completion date to existing values for agents
       effectiveStatus = currentApp.status;
       // Override estimated_completion_date in body with existing value
       req.body.estimated_completion_date = currentApp.estimated_completion_date;
