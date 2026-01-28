@@ -51,7 +51,7 @@ const createTables = async () => {
       )
     `);
 
-    // Customers table
+    // Customers table (base definition)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS customers (
         id SERIAL PRIMARY KEY,
@@ -67,6 +67,18 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Ensure newer customer fields exist (for production DBs created before these fields were added)
+    await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS gender VARCHAR(20)`);
+    await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS occupation VARCHAR(255)`);
+    await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS city VARCHAR(255)`);
+    await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS state VARCHAR(255)`);
+    await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS country VARCHAR(255)`);
+    await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS emergency_contact VARCHAR(255)`);
+    await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS emergency_phone VARCHAR(20)`);
+    await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS notes TEXT`);
+    await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active'`);
+    await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS agent_user_id INTEGER REFERENCES users(id)`);
 
     // Applications table
     await pool.query(`
@@ -211,6 +223,39 @@ const createTables = async () => {
         description TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Permissions & access control tables (used by permissions middleware)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS permissions (
+        id SERIAL PRIMARY KEY,
+        code VARCHAR(100) UNIQUE NOT NULL,
+        description TEXT
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS role_permissions (
+        id SERIAL PRIMARY KEY,
+        role VARCHAR(50) NOT NULL,
+        permission_id INTEGER REFERENCES permissions(id) ON DELETE CASCADE,
+        granted BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(role, permission_id)
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS user_permissions (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        permission_id INTEGER REFERENCES permissions(id) ON DELETE CASCADE,
+        granted BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, permission_id)
       )
     `);
 

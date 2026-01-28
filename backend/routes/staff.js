@@ -14,7 +14,7 @@ router.get('/', authenticateToken, async (req, res) => {
     let query = `
       SELECT s.id, s.first_name, s.last_name, s.email, s.phone, s.position, s.department, 
              s.hire_date, s.salary, s.status, s.location, s.working_hours, 
-             s.created_at, s.updated_at, s.user_id,
+             s.created_at, s.updated_at,
              COUNT(DISTINCT a.id) as total_applications,
              CASE 
                WHEN COUNT(DISTINCT a.id) = 0 THEN 'low'
@@ -43,7 +43,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
     query += ` GROUP BY s.id, s.first_name, s.last_name, s.email, s.phone, s.position, s.department, 
                       s.hire_date, s.salary, s.status, s.location, s.working_hours, 
-                      s.created_at, s.updated_at, s.user_id
+                      s.created_at, s.updated_at
                ORDER BY s.created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     queryParams.push(limit, offset);
 
@@ -168,11 +168,11 @@ router.post('/', authenticateToken, async (req, res) => {
 
     const result = await pool.query(
       `INSERT INTO staff (first_name, last_name, email, phone, position, department, 
-                          hire_date, salary, status, location, working_hours, total_applications, current_workload, user_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                          hire_date, salary, status, location, working_hours, total_applications, current_workload)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        RETURNING *`,
       [first_name, last_name, email, phone, position, department, hire_date, 
-       salary, status, location, working_hours, total_applications, current_workload, userId]
+       salary, status, location, working_hours, total_applications, current_workload]
     );
 
     res.status(201).json({
@@ -272,12 +272,11 @@ router.put('/:id', authenticateToken, async (req, res) => {
        first_name = $1, last_name = $2, email = $3, phone = $4, position = $5,
        department = $6, hire_date = $7, salary = $8, status = $9, location = $10,
        working_hours = $11, total_applications = $12, current_workload = $13,
-       user_id = $14,
        updated_at = CURRENT_TIMESTAMP
-       WHERE id = $15
+       WHERE id = $14
        RETURNING *`,
       [first_name, last_name, email, phone, position, department, hire_date,
-       salary, status, location, working_hours, total_applications, current_workload, userId, id]
+       salary, status, location, working_hours, total_applications, current_workload, id]
     );
 
     if (result.rows.length === 0) {
