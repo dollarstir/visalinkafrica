@@ -1,9 +1,39 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const pool = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Avatar upload configuration
+const avatarsDir = path.join(__dirname, '..', 'uploads', 'avatars');
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    fs.mkdirSync(avatarsDir, { recursive: true });
+    cb(null, avatarsDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.png';
+    cb(null, `user-${req.params.id}-${Date.now()}${ext}`);
+  }
+});
+
+const avatarFileFilter = (req, file, cb) => {
+  if (!file.mimetype.startsWith('image/')) {
+    return cb(new Error('Only image files are allowed for avatars'));
+  }
+  cb(null, true);
+};
+
+const uploadAvatar = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: avatarFileFilter
+});
 
 // Get all users
 router.get('/', authenticateToken, async (req, res) => {
@@ -317,6 +347,44 @@ router.put('/:id', authenticateToken, async (req, res) => {
       });
     }
     
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Upload/update user avatar (multipart/form-data, field name: avatar)
+router.post('/:id/avatar', authenticateToken, uploadAvatar.single('avatar'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Only allow the user or an admin to change this avatar
+    if (req.user.userId !== parseInt(id, 10) && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Permission denied' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Avatar file is required' });
+    }
+
+    const relativePath = `/uploads/avatars/${req.file.filename}`;
+
+    const result = await pool.query(
+      `UPDATE users 
+       SET avatar = $1, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $2 
+       RETURNING id, name, email, role, department, phone, address, avatar, is_active, created_at, updated_at`,
+      [relativePath, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      message: 'Avatar updated successfully',
+      user: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Update avatar error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

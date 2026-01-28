@@ -181,6 +181,9 @@ const createTables = async () => {
       )
     `);
 
+    // Ensure staff avatar column exists
+    await pool.query(`ALTER TABLE staff ADD COLUMN IF NOT EXISTS avatar VARCHAR(255)`);
+
     // Reports table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS reports (

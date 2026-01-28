@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -68,6 +69,9 @@ io.on('connection', (socket) => {
 // Use port 5001 by default since macOS uses 5000 for AirPlay Receiver
 const PORT = process.env.PORT || 5001;
 
+// Behind nginx reverse proxy – trust first proxy so rate limiting and IPs work
+app.set('trust proxy', 1);
+
 // Security middleware - configure helmet for development
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
@@ -108,6 +112,9 @@ app.use(cors({
 // Body parsing middleware - must come before routes
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Serve uploaded files (avatars, etc.)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Logging middleware for debugging
 app.use((req, res, next) => {

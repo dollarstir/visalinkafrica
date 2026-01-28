@@ -1,9 +1,39 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const pool = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Staff avatar upload configuration
+const staffAvatarsDir = path.join(__dirname, '..', 'uploads', 'staff-avatars');
+
+const staffStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    fs.mkdirSync(staffAvatarsDir, { recursive: true });
+    cb(null, staffAvatarsDir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.png';
+    cb(null, `staff-${req.params.id}-${Date.now()}${ext}`);
+  }
+});
+
+const staffAvatarFileFilter = (req, file, cb) => {
+  if (!file.mimetype.startsWith('image/')) {
+    return cb(new Error('Only image files are allowed for avatars'));
+  }
+  cb(null, true);
+};
+
+const uploadStaffAvatar = multer({
+  storage: staffStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: staffAvatarFileFilter
+});
 
 // Get all staff
 router.get('/', authenticateToken, async (req, res) => {
@@ -14,7 +44,7 @@ router.get('/', authenticateToken, async (req, res) => {
     let query = `
       SELECT s.id, s.first_name, s.last_name, s.email, s.phone, s.position, s.department, 
              s.hire_date, s.salary, s.status, s.location, s.working_hours, 
-             s.created_at, s.updated_at,
+             s.created_at, s.updated_at, s.avatar,
              COUNT(DISTINCT a.id) as total_applications,
              CASE 
                WHEN COUNT(DISTINCT a.id) = 0 THEN 'low'
@@ -43,7 +73,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
     query += ` GROUP BY s.id, s.first_name, s.last_name, s.email, s.phone, s.position, s.department, 
                       s.hire_date, s.salary, s.status, s.location, s.working_hours, 
-                      s.created_at, s.updated_at
+                      s.created_at, s.updated_at, s.avatar
                ORDER BY s.created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     queryParams.push(limit, offset);
 
@@ -290,6 +320,39 @@ router.put('/:id', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('Update staff error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Upload/update staff avatar (multipart/form-data, field name: avatar)
+router.post('/:id/avatar', authenticateToken, uploadStaffAvatar.single('avatar'), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Avatar file is required' });
+    }
+
+    const relativePath = `/uploads/staff-avatars/${req.file.filename}`;
+
+    const result = await pool.query(
+      `UPDATE staff 
+       SET avatar = $1, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $2 
+       RETURNING *`,
+      [relativePath, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Staff member not found' });
+    }
+
+    res.json({
+      message: 'Staff avatar updated successfully',
+      staff: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Update staff avatar error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
