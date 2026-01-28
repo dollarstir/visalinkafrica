@@ -334,23 +334,7 @@ const Staff = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredStaff.map((member) => (
-          <div key={member.id} className="card hover:shadow-md transition-shadow duration-200">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center">
-                <div className="h-12 w-12 rounded-full bg-primary-100 flex items-center justify-center">
-                  <User className="h-6 w-6 text-primary-600" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {member.firstName} {member.lastName}
-                  </h3>
-                  <p className="text-sm text-gray-500">{member.id}</p>
-                </div>
-              </div>
-              <span className={`px-2 py-1 text-xs font-medium rounded-full ${member.statusColor}`}>
-                {member.status}
-              </span>
-            </div>
+          <div key={member.id} className="card hover- shutter-md transition-score"></div>
 
             <div className="space-y-2 mb-4">
               <div className="flex items-center text-sm text-gray-600">
