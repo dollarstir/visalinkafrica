@@ -79,7 +79,8 @@ const Staff = () => {
         totalApplications: member.total_applications || 0,
         currentWorkload: member.current_workload ? member.current_workload.charAt(0).toUpperCase() + member.current_workload.slice(1) : 'Low',
         statusColor: getStatusColor(member.status),
-        userId: member.user_id || null
+        userId: member.user_id || null,
+        avatar: member.avatar || null
       }));
       
       setStaff(transformedStaff);

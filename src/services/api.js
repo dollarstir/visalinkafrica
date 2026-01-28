@@ -603,6 +603,51 @@ class ApiService {
     return this.request('/users/stats/overview');
   }
 
+  // User avatar upload (multipart/form-data)
+  async uploadUserAvatar(userId, file) {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const response = await fetch(`${this.baseURL}/users/${userId}/avatar`, {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+        // Content-Type omitted so browser sets correct multipart boundary
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
+  // Staff avatar upload (multipart/form-data)
+  async uploadStaffAvatar(staffId, file) {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const response = await fetch(`${this.baseURL}/staff/${staffId}/avatar`, {
+      method: 'POST',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : ''
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  }
+
   // Permissions endpoints
   async getPermissions(params = {}) {
     const filteredParams = {};

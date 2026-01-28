@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, 
   Mail, 
@@ -63,6 +63,9 @@ const UserProfile = () => {
       timezone: 'UTC'
     };
   });
+
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef(null);
 
   useEffect(() => {
     loadUserProfile();
@@ -267,6 +270,43 @@ const UserProfile = () => {
     }
   };
 
+  const handleAvatarClick = () => {
+    if (avatarInputRef.current) {
+      avatarInputRef.current.click();
+    }
+  };
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file || !user) return;
+
+    try {
+      setAvatarUploading(true);
+      const response = await apiService.uploadUserAvatar(user.id, file);
+      const updatedUser = response.user || response;
+      const newAvatar = updatedUser.avatar;
+
+      setFormData(prev => ({
+        ...prev,
+        avatar: newAvatar || null
+      }));
+
+      // Update cached auth user so the rest of the app can pick it up on reload
+      const cached = { ...(user || {}), avatar: newAvatar };
+      localStorage.setItem('visaLink_user', JSON.stringify(cached));
+
+      showSuccess('Profile photo updated');
+    } catch (err) {
+      console.error('Avatar upload error:', err);
+      showError(err.message || 'Failed to upload profile photo');
+    } finally {
+      setAvatarUploading(false);
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = '';
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6 dark:bg-gray-900 min-h-screen">
@@ -304,7 +344,7 @@ const UserProfile = () => {
             {/* Avatar Section */}
             <div className="flex items-center mb-6">
               <div className="relative">
-                <div className="h-20 w-20 rounded-full bg-primary-100 flex items-center justify-center">
+                <div className="h-20 w-20 rounded-full bg-primary-100 flex items-center justify-center overflow-hidden">
                   {formData.avatar ? (
                     <img
                       src={formData.avatar}
@@ -316,14 +356,32 @@ const UserProfile = () => {
                   )}
                 </div>
                 {isEditing && (
-                  <button className="absolute bottom-0 right-0 h-6 w-6 bg-primary-600 rounded-full flex items-center justify-center text-white hover:bg-primary-700">
-                    <Camera className="h-3 w-3" />
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleAvatarClick}
+                      disabled={avatarUploading}
+                      className="absolute bottom-0 right-0 h-7 w-7 bg-primary-600 rounded-full flex items-center justify-center text-white hover:bg-primary-700 disabled:opacity-60"
+                      title={avatarUploading ? 'Uploading...' : 'Change profile photo'}
+                    >
+                      <Camera className="h-3 w-3" />
+                    </button>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarChange}
+                    />
+                  </>
                 )}
               </div>
               <div className="ml-4">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">{formData.name}</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">{formData.role}</p>
+                {avatarUploading && (
+                  <p className="text-xs text-gray-500 mt-1">Uploading photo...</p>
+                )}
               </div>
             </div>
 

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Save, User, Mail, Phone, Calendar, MapPin, DollarSign, Clock, Briefcase, Lock, Link2, Unlink } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Save, User, Mail, Phone, Calendar, MapPin, DollarSign, Clock, Briefcase, Lock, Link2, Unlink, Camera } from 'lucide-react';
 import apiService from '../../services/api';
 import { showError } from '../../utils/toast';
 
@@ -27,6 +27,9 @@ const EditStaffModal = ({ staff, onClose, onSave }) => {
   });
 
   const [errors, setErrors] = useState({});
+  const [avatarPreview, setAvatarPreview] = useState(staff?.avatar || null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef(null);
   const [linkedUserId, setLinkedUserId] = useState(null);
   const [linkedUserEmail, setLinkedUserEmail] = useState(null);
   const [showLinkUserSection, setShowLinkUserSection] = useState(false);
@@ -58,8 +61,35 @@ const EditStaffModal = ({ staff, onClose, onSave }) => {
       if (staff.userId) {
         loadLinkedUserInfo(staff.userId);
       }
+      setAvatarPreview(staff.avatar || null);
     }
   }, [staff]);
+
+  const handleAvatarClick = () => {
+    if (avatarInputRef.current) {
+      avatarInputRef.current.click();
+    }
+  };
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file || !staff?.id) return;
+
+    try {
+      setAvatarUploading(true);
+      const response = await apiService.uploadStaffAvatar(staff.id, file);
+      const updated = response.staff || response;
+      setAvatarPreview(updated.avatar || null);
+    } catch (err) {
+      console.error('Staff avatar upload error:', err);
+      showError(err.message || 'Failed to upload staff photo');
+    } finally {
+      setAvatarUploading(false);
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = '';
+      }
+    }
+  };
 
   const loadLinkedUserInfo = async (userId) => {
     try {
@@ -270,6 +300,45 @@ const EditStaffModal = ({ staff, onClose, onSave }) => {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Profile Photo */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium text-gray-900">Profile Photo</h3>
+            <div className="flex items-center space-x-4">
+              <div className="relative">
+                <div className="h-20 w-20 rounded-full bg-primary-100 flex items-center justify-center overflow-hidden">
+                  {avatarPreview ? (
+                    <img
+                      src={avatarPreview}
+                      alt="Staff avatar"
+                      className="h-20 w-20 rounded-full object-cover"
+                    />
+                  ) : (
+                    <User className="h-10 w-10 text-primary-600" />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAvatarClick}
+                  disabled={avatarUploading}
+                  className="absolute bottom-0 right-0 h-7 w-7 bg-primary-600 rounded-full flex items-center justify-center text-white hover:bg-primary-700 disabled:opacity-60"
+                  title={avatarUploading ? 'Uploading...' : 'Change photo'}
+                >
+                  <Camera className="h-3 w-3" />
+                </button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                />
+              </div>
+              {avatarUploading && (
+                <p className="text-sm text-gray-500">Uploading photo...</p>
+              )}
+            </div>
+          </div>
+
           {/* Personal Information */}
           <div className="space-y-4">
             <h3 className="text-lg font-medium text-gray-900">Personal Information</h3>

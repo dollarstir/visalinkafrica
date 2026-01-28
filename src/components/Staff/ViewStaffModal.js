@@ -74,8 +74,16 @@ const ViewStaffModal = ({ staff, onClose }) => {
           {/* Staff Header */}
           <div className="flex items-start justify-between">
             <div className="flex items-center space-x-4">
-              <div className="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center">
-                <User className="h-8 w-8 text-primary-600" />
+              <div className="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center overflow-hidden">
+                {staff.avatar ? (
+                  <img
+                    src={staff.avatar}
+                    alt={`${staff.firstName} ${staff.lastName}`}
+                    className="h-16 w-16 rounded-full object-cover"
+                  />
+                ) : (
+                  <User className="h-8 w-8 text-primary-600" />
+                )}
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">
