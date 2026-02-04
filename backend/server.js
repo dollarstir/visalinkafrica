@@ -139,6 +139,7 @@ app.use('/api/documents', require('./routes/documents'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/website', require('./routes/website'));
 app.use('/api/agent-applications', require('./routes/agentApplications'));
+app.use('/api/agents', require('./routes/agents'));
 
 // Auto-run database migrations on startup (production only)
 const runMigrationsOnStartup = async () => {

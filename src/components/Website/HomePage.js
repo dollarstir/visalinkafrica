@@ -1,10 +1,12 @@
 import React from 'react';
-import WebsitePage from './WebsitePage';
 import { Link } from 'react-router-dom';
+import ImageSlider from './ImageSlider';
+import WebsitePage from './WebsitePage';
 
 const HomePage = () => {
   return (
     <>
+      <ImageSlider pageSlug="home" />
       <section className="bg-gradient-to-br from-primary-50 to-primary-100 dark:from-gray-800 dark:to-gray-900 py-16 md:py-24">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">

@@ -22,6 +22,8 @@ const PublicLayout = () => {
     { to: '/', end: true, label: 'Home' },
     { to: '/about', end: false, label: 'About' },
     { to: '/services', end: false, label: 'Services' },
+    { to: '/blog', end: false, label: 'Blog' },
+    { to: '/careers', end: false, label: 'Careers' },
     { to: '/contact', end: false, label: 'Contact' },
   ];
 
@@ -108,6 +110,8 @@ const PublicLayout = () => {
             <div className="flex gap-6">
               <Link to="/about" className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400">About</Link>
               <Link to="/services" className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400">Services</Link>
+              <Link to="/blog" className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400">Blog</Link>
+              <Link to="/careers" className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400">Careers</Link>
               <Link to="/contact" className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400">Contact</Link>
               <Link to="/login" className="text-sm text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400">CRM Login</Link>
             </div>

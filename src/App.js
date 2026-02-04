@@ -25,12 +25,17 @@ import Users from './components/Users/Users';
 import Settings from './components/Settings/Settings';
 import WebsiteEditor from './components/Website/WebsiteEditor';
 import AgentApplications from './components/AgentApplications/AgentApplications';
+import Agents from './components/Agents/Agents';
 import PublicLayout from './components/Website/PublicLayout';
 import HomePage from './components/Website/HomePage';
 import AboutPage from './components/Website/AboutPage';
 import ServicesPage from './components/Website/ServicesPage';
 import ContactPage from './components/Website/ContactPage';
 import RegisterAgentPage from './components/Website/RegisterAgentPage';
+import BlogListPage from './components/Website/BlogListPage';
+import BlogPostPage from './components/Website/BlogPostPage';
+import CareersPage from './components/Website/CareersPage';
+import JobPostPage from './components/Website/JobPostPage';
 
 function LoginRoute() {
   const { isAuthenticated, login } = useAuth();
@@ -67,6 +72,10 @@ function App() {
                 <Route index element={<HomePage />} />
                 <Route path="about" element={<AboutPage />} />
                 <Route path="services" element={<ServicesPage />} />
+                <Route path="blog" element={<BlogListPage />} />
+                <Route path="blog/:slug" element={<BlogPostPage />} />
+                <Route path="careers" element={<CareersPage />} />
+                <Route path="careers/:slug" element={<JobPostPage />} />
                 <Route path="contact" element={<ContactPage />} />
                 <Route path="register-agent" element={<RegisterAgentPage />} />
               </Route>
@@ -85,6 +94,7 @@ function App() {
                 <Route path="reports" element={<Reports />} />
                 <Route path="documents" element={<DocumentManager />} />
                 <Route path="users" element={<Users />} />
+                <Route path="agents" element={<Agents />} />
                 <Route path="agent-applications" element={<AgentApplications />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="website" element={<WebsiteEditor />} />

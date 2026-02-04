@@ -75,21 +75,24 @@ router.get('/', authenticateToken, async (req, res) => {
       }
     }
 
-    // NOTE: Agent-specific filtering is disabled for now because the
-    // applications table does not include an agent_user_id column in the schema.
+    // If user is agent, only show applications they created
+    if (userRole === 'agent') {
+      shouldFilterByAgent = true;
+    }
+
     let query = `
-      SELECT a.id, a.customer_id, a.service_id, a.staff_id, a.status, a.priority, a.documents, 
+      SELECT a.id, a.customer_id, a.service_id, a.staff_id, a.agent_user_id, a.status, a.priority, a.documents, 
              a.notes, a.estimated_completion_date, a.actual_completion_date, 
              a.created_at, a.updated_at,
              c.first_name, c.last_name, c.email, c.phone,
              s.name as service_name,
              CONCAT(st.first_name, ' ', st.last_name) as staff_name,
-             NULL::integer as agent_user_id,
-             NULL::text as agent_name
+             u_agent.name as agent_name
       FROM applications a
       LEFT JOIN customers c ON a.customer_id = c.id
       LEFT JOIN services s ON a.service_id = s.id
       LEFT JOIN staff st ON a.staff_id = st.id
+      LEFT JOIN users u_agent ON a.agent_user_id = u_agent.id
       WHERE 1=1
     `;
     const queryParams = [];
@@ -102,8 +105,11 @@ router.get('/', authenticateToken, async (req, res) => {
       queryParams.push(staffId);
     }
 
-    // NOTE: Agent-based filtering is disabled because applications schema
-    // does not include an agent_user_id column.
+    if (shouldFilterByAgent) {
+      paramCount++;
+      query += ` AND a.agent_user_id = $${paramCount}`;
+      queryParams.push(userId);
+    }
 
     if (search) {
       paramCount++;
@@ -145,24 +151,27 @@ router.get('/', authenticateToken, async (req, res) => {
       countParams.push(staffId);
     }
 
-    // NOTE: Agent-based filtering is disabled because applications schema
-    // does not include an agent_user_id column.
+    if (shouldFilterByAgent) {
+      countParamCount++;
+      countQuery += ` AND a.agent_user_id = $${countParamCount}`;
+      countParams.push(userId);
+    }
 
     if (search) {
-      paramCount++;
-      countQuery += ` AND (c.first_name ILIKE $${paramCount} OR c.last_name ILIKE $${paramCount} OR c.email ILIKE $${paramCount} OR s.name ILIKE $${paramCount})`;
+      countParamCount++;
+      countQuery += ` AND (c.first_name ILIKE $${countParamCount} OR c.last_name ILIKE $${countParamCount} OR c.email ILIKE $${countParamCount} OR s.name ILIKE $${countParamCount})`;
       countParams.push(`%${search}%`);
     }
 
     if (status !== 'all') {
-      paramCount++;
-      countQuery += ` AND a.status = $${paramCount}`;
+      countParamCount++;
+      countQuery += ` AND a.status = $${countParamCount}`;
       countParams.push(status);
     }
 
     if (priority !== 'all') {
-      paramCount++;
-      countQuery += ` AND a.priority = $${paramCount}`;
+      countParamCount++;
+      countQuery += ` AND a.priority = $${countParamCount}`;
       countParams.push(priority);
     }
 
@@ -211,11 +220,13 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     const result = await pool.query(
       `SELECT a.*, c.first_name, c.last_name, c.email, c.phone, s.name as service_name, 
-              CONCAT(st.first_name, ' ', st.last_name) as staff_name
+              CONCAT(st.first_name, ' ', st.last_name) as staff_name,
+              u_agent.name as agent_name
        FROM applications a
        LEFT JOIN customers c ON a.customer_id = c.id
        LEFT JOIN services s ON a.service_id = s.id
        LEFT JOIN staff st ON a.staff_id = st.id
+       LEFT JOIN users u_agent ON a.agent_user_id = u_agent.id
        WHERE a.id = $1`,
       [id]
     );
@@ -228,6 +239,11 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     // If staff doesn't have view permission, check if application is assigned to them
     if (shouldFilterByStaff && application.staff_id !== staffId) {
+      return res.status(403).json({ error: 'Access denied. This application is not assigned to you.' });
+    }
+
+    // If user is agent, only allow viewing their own applications
+    if (userRole === 'agent' && application.agent_user_id !== userId) {
       return res.status(403).json({ error: 'Access denied. This application is not assigned to you.' });
     }
 
@@ -254,14 +270,15 @@ router.post('/', authenticateToken, async (req, res) => {
       estimated_completion_date
     } = req.body;
 
-    // For agents, force status to 'draft' and ignore estimated_completion_date
+    // For agents, force status to 'draft' and ignore estimated_completion_date; set agent_user_id
     const effectiveStatus = userRole === 'agent' ? 'draft' : status;
     const effectiveEstimatedDate = userRole === 'agent' ? null : estimated_completion_date;
+    const agentUserId = userRole === 'agent' ? userId : null;
 
-    const insertQuery = `INSERT INTO applications (customer_id, service_id, staff_id, status, priority, documents, notes, estimated_completion_date)
-                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    const insertQuery = `INSERT INTO applications (customer_id, service_id, staff_id, agent_user_id, status, priority, documents, notes, estimated_completion_date)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
                          RETURNING *`;
-    const insertParams = [customer_id, service_id, staff_id, effectiveStatus, priority, documents, notes, effectiveEstimatedDate];
+    const insertParams = [customer_id, service_id, staff_id, agentUserId, effectiveStatus, priority, documents, notes, effectiveEstimatedDate];
 
     const result = await pool.query(insertQuery, insertParams);
     const application = result.rows[0];
@@ -376,7 +393,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
     // Get current application data to check status change and get customer info
     const currentAppResult = await pool.query(
-      'SELECT status, estimated_completion_date, customer_id, service_id FROM applications WHERE id = $1',
+      'SELECT status, estimated_completion_date, customer_id, service_id, agent_user_id FROM applications WHERE id = $1',
       [id]
     );
     

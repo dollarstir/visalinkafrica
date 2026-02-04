@@ -87,6 +87,7 @@ const createTables = async () => {
         customer_id INTEGER REFERENCES customers(id),
         service_id INTEGER REFERENCES services(id),
         staff_id INTEGER REFERENCES users(id),
+        agent_user_id INTEGER REFERENCES users(id),
         status VARCHAR(50) DEFAULT 'draft',
         priority VARCHAR(20) DEFAULT 'normal',
         documents JSONB,
@@ -97,6 +98,7 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    await pool.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS agent_user_id INTEGER REFERENCES users(id)`);
 
     // Visitors table
     await pool.query(`
@@ -270,6 +272,59 @@ const createTables = async () => {
         title VARCHAR(255) NOT NULL,
         body TEXT,
         meta_description VARCHAR(500),
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Homepage / page image slider
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS website_slides (
+        id SERIAL PRIMARY KEY,
+        page_slug VARCHAR(100) NOT NULL DEFAULT 'home',
+        title VARCHAR(255),
+        subtitle TEXT,
+        image_url VARCHAR(500) NOT NULL,
+        link_url VARCHAR(500),
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Blog posts
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS blog_posts (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(500) NOT NULL,
+        slug VARCHAR(255) UNIQUE NOT NULL,
+        excerpt TEXT,
+        body TEXT,
+        featured_image VARCHAR(500),
+        author_id INTEGER REFERENCES users(id),
+        status VARCHAR(20) NOT NULL DEFAULT 'draft',
+        published_at TIMESTAMP,
+        meta_description VARCHAR(500),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Job posts (careers)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS job_posts (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(500) NOT NULL,
+        slug VARCHAR(255) UNIQUE NOT NULL,
+        department VARCHAR(255),
+        location VARCHAR(255),
+        employment_type VARCHAR(100),
+        description TEXT,
+        requirements TEXT,
+        how_to_apply TEXT,
+        application_deadline DATE,
+        status VARCHAR(20) NOT NULL DEFAULT 'draft',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);

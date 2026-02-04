@@ -603,6 +603,16 @@ class ApiService {
     return this.request('/users/stats/overview');
   }
 
+  // Agents (users with role=agent) – list with application stats
+  async getAgents(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/agents${qs ? `?${qs}` : ''}`);
+  }
+
+  async getAgent(id) {
+    return this.request(`/agents/${id}`);
+  }
+
   // User avatar upload (multipart/form-data)
   async uploadUserAvatar(userId, file) {
     const token = localStorage.getItem('token');
@@ -769,10 +779,92 @@ class ApiService {
   }
 
   async updateWebsitePage(slug, data) {
-    return this.request('/website/pages', {
+    return this.request(`/website/pages/${encodeURIComponent(slug)}`, {
       method: 'PUT',
-      body: JSON.stringify({ slug, ...data })
+      body: JSON.stringify(data)
     });
+  }
+
+  // Website image upload (admin)
+  async uploadWebsiteImage(file) {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(`${this.baseURL}/website/upload`, {
+      method: 'POST',
+      headers: { 'Authorization': token ? `Bearer ${token}` : '' },
+      body: formData
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Upload failed');
+    }
+    return response.json();
+  }
+
+  // Slider (public + admin)
+  async getWebsiteSlides(page = 'home') {
+    const res = await fetch(`${this.baseURL}/website/slides?page=${encodeURIComponent(page)}`);
+    if (!res.ok) return { slides: [] };
+    return res.json();
+  }
+  async getWebsiteSlidesAll() {
+    return this.request('/website/slides/all');
+  }
+  async createWebsiteSlide(data) {
+    return this.request('/website/slides', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateWebsiteSlide(id, data) {
+    return this.request(`/website/slides/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteWebsiteSlide(id) {
+    return this.request(`/website/slides/${id}`, { method: 'DELETE' });
+  }
+
+  // Blog (public + admin)
+  async getBlogPosts(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    const res = await fetch(`${this.baseURL}/website/blog${qs ? `?${qs}` : ''}`);
+    if (!res.ok) return { posts: [], pagination: {} };
+    return res.json();
+  }
+  async getBlogPostsAll() {
+    return this.request('/website/blog/all');
+  }
+  async getBlogPost(slug) {
+    return this.request(`/website/blog/${encodeURIComponent(slug)}`);
+  }
+  async createBlogPost(data) {
+    return this.request('/website/blog', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateBlogPost(id, data) {
+    return this.request(`/website/blog/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteBlogPost(id) {
+    return this.request(`/website/blog/${id}`, { method: 'DELETE' });
+  }
+
+  // Jobs (public + admin)
+  async getJobPosts(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    const res = await fetch(`${this.baseURL}/website/jobs${qs ? `?${qs}` : ''}`);
+    if (!res.ok) return { jobs: [], pagination: {} };
+    return res.json();
+  }
+  async getJobPostsAll() {
+    return this.request('/website/jobs/all');
+  }
+  async getJobPost(slug) {
+    return this.request(`/website/jobs/${encodeURIComponent(slug)}`);
+  }
+  async createJobPost(data) {
+    return this.request('/website/jobs', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateJobPost(id, data) {
+    return this.request(`/website/jobs/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteJobPost(id) {
+    return this.request(`/website/jobs/${id}`, { method: 'DELETE' });
   }
 
   // Agent applications (admin: list, approve, reject)
