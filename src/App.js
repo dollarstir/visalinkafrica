@@ -26,6 +26,7 @@ import Settings from './components/Settings/Settings';
 import WebsiteEditor from './components/Website/WebsiteEditor';
 import AgentApplications from './components/AgentApplications/AgentApplications';
 import Agents from './components/Agents/Agents';
+import JobApplicationsList from './components/JobApplications/JobApplications';
 import PublicLayout from './components/Website/PublicLayout';
 import HomePage from './components/Website/HomePage';
 import AboutPage from './components/Website/AboutPage';
@@ -96,6 +97,7 @@ function App() {
                 <Route path="users" element={<Users />} />
                 <Route path="agents" element={<Agents />} />
                 <Route path="agent-applications" element={<AgentApplications />} />
+                <Route path="job-applications" element={<JobApplicationsList />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="website" element={<WebsiteEditor />} />
               </Route>

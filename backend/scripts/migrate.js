@@ -239,6 +239,8 @@ const createTables = async () => {
         description TEXT
       )
     `);
+    await pool.query(`ALTER TABLE permissions ADD COLUMN IF NOT EXISTS name VARCHAR(255)`);
+    await pool.query(`ALTER TABLE permissions ADD COLUMN IF NOT EXISTS category VARCHAR(100)`);
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS role_permissions (
@@ -324,6 +326,23 @@ const createTables = async () => {
         how_to_apply TEXT,
         application_deadline DATE,
         status VARCHAR(20) NOT NULL DEFAULT 'draft',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Job applications (applicants apply for job posts)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS job_applications (
+        id SERIAL PRIMARY KEY,
+        job_post_id INTEGER NOT NULL REFERENCES job_posts(id) ON DELETE CASCADE,
+        applicant_name VARCHAR(255) NOT NULL,
+        applicant_email VARCHAR(255) NOT NULL,
+        applicant_phone VARCHAR(100),
+        cover_letter TEXT,
+        resume_path VARCHAR(500),
+        status VARCHAR(30) NOT NULL DEFAULT 'new',
+        admin_notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )

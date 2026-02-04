@@ -6,7 +6,7 @@ const { requirePermission } = require('../middleware/permissions');
 const router = express.Router();
 
 // List all agents with total applications and vital application stats (admin only)
-router.get('/', authenticateToken, requirePermission('users.view'), async (req, res) => {
+router.get('/', authenticateToken, requirePermission('agents.view'), async (req, res) => {
   try {
     const { page = 1, limit = 20, search = '' } = req.query;
     const offset = (page - 1) * limit;
@@ -64,7 +64,7 @@ router.get('/', authenticateToken, requirePermission('users.view'), async (req, 
 });
 
 // Get one agent by id with application summary and recent applications (admin only)
-router.get('/:id', authenticateToken, requirePermission('users.view'), async (req, res) => {
+router.get('/:id', authenticateToken, requirePermission('agents.view'), async (req, res) => {
   try {
     const { id } = req.params;
 

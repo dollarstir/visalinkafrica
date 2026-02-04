@@ -867,6 +867,43 @@ class ApiService {
     return this.request(`/website/jobs/${id}`, { method: 'DELETE' });
   }
 
+  // Job applications (public submit; admin list/view/update)
+  async submitJobApplication(jobId, { applicant_name, applicant_email, applicant_phone, cover_letter }, resumeFile = null) {
+    const formData = new FormData();
+    formData.append('job_id', jobId);
+    formData.append('applicant_name', applicant_name);
+    formData.append('applicant_email', applicant_email);
+    if (applicant_phone) formData.append('applicant_phone', applicant_phone);
+    if (cover_letter) formData.append('cover_letter', cover_letter);
+    if (resumeFile) formData.append('resume', resumeFile);
+    const url = `${this.baseURL}/website/jobs/apply`;
+    const response = await fetch(url, {
+      method: 'POST',
+      body: formData
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Application failed');
+    }
+    return response.json();
+  }
+
+  async getJobApplications(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/website/job-applications${qs ? `?${qs}` : ''}`);
+  }
+
+  async getJobApplication(id) {
+    return this.request(`/website/job-applications/${id}`);
+  }
+
+  async updateJobApplication(id, data) {
+    return this.request(`/website/job-applications/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  }
+
   // Agent applications (admin: list, approve, reject)
   async getAgentApplications(params = {}) {
     const qs = new URLSearchParams(params).toString();

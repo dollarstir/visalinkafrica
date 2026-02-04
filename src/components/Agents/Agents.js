@@ -88,7 +88,7 @@ const Agents = () => {
     setAgentDetail(null);
   };
 
-  if (!hasPermission(user, 'users.view') && user?.role !== 'admin') {
+  if (!hasPermission(user, 'agents.view') && user?.role !== 'admin') {
     return <Navigate to="/app" replace />;
   }
 

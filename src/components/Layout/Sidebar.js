@@ -14,7 +14,8 @@ import {
   User,
   X,
   Shield,
-  Globe
+  Globe,
+  Briefcase
 } from 'lucide-react';
 import { useAuth } from '../Auth/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -29,7 +30,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
 
   // Fetch pending agent applications count (for badge); refetch when notifications or route change
   useEffect(() => {
-    if (!user || !hasPermission(user, 'users.view')) return;
+    if (!user || !hasPermission(user, 'agent_applications.view')) return;
     apiService.getAgentApplicationsCount('pending').then(setPendingAgentCount).catch(() => setPendingAgentCount(0));
   }, [user, unreadCount, location.pathname]);
 
@@ -46,9 +47,10 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     { name: 'Reports', href: '/app/reports', icon: BarChart3, permission: 'reports.view' },
     { name: 'Documents', href: '/app/documents', icon: FileText, permission: 'documents.view' },
     { name: 'Users', href: '/app/users', icon: Shield, permission: 'users.view' },
-    { name: 'Agents', href: '/app/agents', icon: UserPlus, permission: 'users.view' },
-    { name: 'Agents Request', href: '/app/agent-applications', icon: UserCheck, permission: 'users.view', badgeKey: 'agent-applications' },
-    { name: 'Website', href: '/app/website', icon: Globe, permission: 'settings.update' },
+    { name: 'Agents', href: '/app/agents', icon: UserPlus, permission: 'agents.view' },
+    { name: 'Agents Request', href: '/app/agent-applications', icon: UserCheck, permission: 'agent_applications.view', badgeKey: 'agent-applications' },
+    { name: 'Website', href: '/app/website', icon: Globe, permission: 'website.view' },
+    { name: 'Job Applications', href: '/app/job-applications', icon: Briefcase, permission: 'job_applications.view' },
     { name: 'Settings', href: '/app/settings', icon: Settings, permission: 'settings.view' },
     { name: 'Profile', href: '/app/profile', icon: User, permission: null },
   ].filter(item => {
@@ -126,21 +128,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
             })}
           </div>
         </nav>
-
-        {/* User info at bottom */}
-        <div className="absolute bottom-0 w-full p-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="h-8 w-8 rounded-full bg-primary-600 dark:bg-primary-500 flex items-center justify-center">
-                <span className="text-sm font-medium text-white">A</span>
-              </div>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Admin User</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">admin@visalink.com</p>
-            </div>
-          </div>
-        </div>
       </div>
     </>
   );

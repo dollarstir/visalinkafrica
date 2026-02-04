@@ -31,8 +31,32 @@ const websiteUpload = multer({
   }
 });
 
+// Resume upload for job applications (public apply)
+const resumesDir = path.join(__dirname, '..', 'uploads', 'website', 'resumes');
+if (!fs.existsSync(resumesDir)) {
+  fs.mkdirSync(resumesDir, { recursive: true });
+}
+const resumeStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, resumesDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.pdf';
+    cb(null, `resume-${Date.now()}-${Math.random().toString(36).slice(2, 9)}${ext}`);
+  }
+});
+const resumeUpload = multer({
+  storage: resumeStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!allowed.includes(file.mimetype) && !file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only PDF, Word or image files are allowed for resume'));
+    }
+    cb(null, true);
+  }
+});
+
 // Admin: upload image for slider/blog (returns URL for use in content)
-router.post('/upload', authenticateToken, requirePermission('settings.update'), websiteUpload.single('file'), (req, res) => {
+router.post('/upload', authenticateToken, requirePermission('website.update'), websiteUpload.single('file'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -95,7 +119,7 @@ async function upsertPage(slug, { title, body, meta_description }) {
   return { page: insertResult.rows[0], message: 'Page created successfully' };
 }
 
-router.put('/pages/:slug', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+router.put('/pages/:slug', authenticateToken, requirePermission('website.update'), async (req, res) => {
   try {
     const result = await upsertPage(req.params.slug, req.body);
     res.json(result);
@@ -105,7 +129,7 @@ router.put('/pages/:slug', authenticateToken, requirePermission('settings.update
   }
 });
 
-router.put('/pages', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+router.put('/pages', authenticateToken, requirePermission('website.update'), async (req, res) => {
   try {
     const slug = req.body.slug;
     if (!slug || typeof slug !== 'string') {
@@ -139,7 +163,7 @@ router.get('/slides', async (req, res) => {
 });
 
 // Admin: get all slides
-router.get('/slides/all', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+router.get('/slides/all', authenticateToken, requirePermission('website.update'), async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT * FROM website_slides ORDER BY page_slug, sort_order, id'
@@ -151,7 +175,7 @@ router.get('/slides/all', authenticateToken, requirePermission('settings.update'
   }
 });
 
-router.post('/slides', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+router.post('/slides', authenticateToken, requirePermission('website.update'), async (req, res) => {
   try {
     const { page_slug = 'home', title, subtitle, image_url, link_url, sort_order = 0, is_active = true } = req.body;
     if (!image_url) {
@@ -170,7 +194,7 @@ router.post('/slides', authenticateToken, requirePermission('settings.update'), 
   }
 });
 
-router.put('/slides/:id', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+router.put('/slides/:id', authenticateToken, requirePermission('website.update'), async (req, res) => {
   try {
     const { id } = req.params;
     const { page_slug, title, subtitle, image_url, link_url, sort_order, is_active } = req.body;
@@ -197,7 +221,7 @@ router.put('/slides/:id', authenticateToken, requirePermission('settings.update'
   }
 });
 
-router.delete('/slides/:id', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+router.delete('/slides/:id', authenticateToken, requirePermission('website.update'), async (req, res) => {
   try {
     const result = await pool.query('DELETE FROM website_slides WHERE id = $1 RETURNING id', [req.params.id]);
     if (result.rows.length === 0) {
@@ -239,7 +263,7 @@ router.get('/blog', async (req, res) => {
 });
 
 // Admin: list all posts (including drafts)
-router.get('/blog/all', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+router.get('/blog/all', authenticateToken, requirePermission('website.update'), async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT id, title, slug, excerpt, featured_image, status, published_at, created_at, updated_at
@@ -275,7 +299,7 @@ router.get('/blog/:slug', async (req, res) => {
   }
 });
 
-router.post('/blog', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+router.post('/blog', authenticateToken, requirePermission('website.update'), async (req, res) => {
   try {
     const { title, slug, excerpt, body, featured_image, status = 'draft', published_at, meta_description } = req.body;
     if (!title) return res.status(400).json({ error: 'title is required' });
@@ -294,7 +318,7 @@ router.post('/blog', authenticateToken, requirePermission('settings.update'), as
   }
 });
 
-router.put('/blog/:id', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+router.put('/blog/:id', authenticateToken, requirePermission('website.update'), async (req, res) => {
   try {
     const { id } = req.params;
     const { title, slug, excerpt, body, featured_image, status, published_at, meta_description } = req.body;
@@ -321,7 +345,7 @@ router.put('/blog/:id', authenticateToken, requirePermission('settings.update'),
   }
 });
 
-router.delete('/blog/:id', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+router.delete('/blog/:id', authenticateToken, requirePermission('website.update'), async (req, res) => {
   try {
     const result = await pool.query('DELETE FROM blog_posts WHERE id = $1 RETURNING id', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Post not found' });
@@ -361,7 +385,7 @@ router.get('/jobs', async (req, res) => {
 });
 
 // Admin: list all jobs
-router.get('/jobs/all', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+router.get('/jobs/all', authenticateToken, requirePermission('website.update'), async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT * FROM job_posts ORDER BY created_at DESC'
@@ -369,6 +393,34 @@ router.get('/jobs/all', authenticateToken, requirePermission('settings.update'),
     res.json({ jobs: result.rows });
   } catch (error) {
     console.error('Get jobs all error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Public: submit job application (no auth)
+router.post('/jobs/apply', resumeUpload.single('resume'), async (req, res) => {
+  try {
+    const { job_id, applicant_name, applicant_email, applicant_phone, cover_letter } = req.body || {};
+    if (!job_id || !applicant_name || !applicant_email) {
+      return res.status(400).json({ error: 'job_id, applicant_name and applicant_email are required' });
+    }
+    const jobRow = await pool.query(
+      'SELECT id FROM job_posts WHERE id = $1 AND status = $2',
+      [job_id, 'published']
+    );
+    if (jobRow.rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found or not accepting applications' });
+    }
+    const resumePath = req.file ? `/uploads/website/resumes/${req.file.filename}` : null;
+    const result = await pool.query(
+      `INSERT INTO job_applications (job_post_id, applicant_name, applicant_email, applicant_phone, cover_letter, resume_path, status)
+       VALUES ($1, $2, $3, $4, $5, $6, 'new')
+       RETURNING id, job_post_id, applicant_name, applicant_email, status, created_at`,
+      [job_id, applicant_name.trim(), applicant_email.trim(), (applicant_phone || '').trim() || null, (cover_letter || '').trim() || null, resumePath]
+    );
+    res.status(201).json({ application: result.rows[0], message: 'Application submitted successfully' });
+  } catch (error) {
+    console.error('Job apply error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -391,7 +443,7 @@ router.get('/jobs/:slug', async (req, res) => {
   }
 });
 
-router.post('/jobs', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+router.post('/jobs', authenticateToken, requirePermission('website.update'), async (req, res) => {
   try {
     const { title, slug, department, location, employment_type, description, requirements, how_to_apply, application_deadline, status = 'draft' } = req.body;
     if (!title) return res.status(400).json({ error: 'title is required' });
@@ -410,7 +462,7 @@ router.post('/jobs', authenticateToken, requirePermission('settings.update'), as
   }
 });
 
-router.put('/jobs/:id', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+router.put('/jobs/:id', authenticateToken, requirePermission('website.update'), async (req, res) => {
   try {
     const { id } = req.params;
     const { title, slug, department, location, employment_type, description, requirements, how_to_apply, application_deadline, status } = req.body;
@@ -439,13 +491,93 @@ router.put('/jobs/:id', authenticateToken, requirePermission('settings.update'),
   }
 });
 
-router.delete('/jobs/:id', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+router.delete('/jobs/:id', authenticateToken, requirePermission('website.update'), async (req, res) => {
   try {
     const result = await pool.query('DELETE FROM job_posts WHERE id = $1 RETURNING id', [req.params.id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Job not found' });
     res.json({ message: 'Job deleted' });
   } catch (error) {
     console.error('Delete job error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ---------- Job applications (admin) ----------
+router.get('/job-applications', authenticateToken, requirePermission('job_applications.view'), async (req, res) => {
+  try {
+    const { page = 1, limit = 20, job_id, status } = req.query;
+    const offset = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+    let where = 'WHERE 1=1';
+    const params = [];
+    let n = 0;
+    if (job_id) {
+      n++;
+      where += ` AND ja.job_post_id = $${n}`;
+      params.push(job_id);
+    }
+    if (status) {
+      n++;
+      where += ` AND ja.status = $${n}`;
+      params.push(status);
+    }
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS total FROM job_applications ja ${where}`,
+      params
+    );
+    const total = countResult.rows[0]?.total || 0;
+    params.push(parseInt(limit, 10), offset);
+    const result = await pool.query(
+      `SELECT ja.id, ja.job_post_id, ja.applicant_name, ja.applicant_email, ja.applicant_phone, ja.cover_letter, ja.resume_path, ja.status, ja.admin_notes, ja.created_at,
+              jp.title AS job_title, jp.slug AS job_slug
+       FROM job_applications ja
+       JOIN job_posts jp ON jp.id = ja.job_post_id
+       ${where}
+       ORDER BY ja.created_at DESC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+    res.json({
+      applications: result.rows,
+      pagination: { page: parseInt(page, 10), limit: parseInt(limit, 10), total, pages: Math.ceil(total / limit) || 1 }
+    });
+  } catch (error) {
+    console.error('Get job applications error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/job-applications/:id', authenticateToken, requirePermission('job_applications.view'), async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT ja.*, jp.title AS job_title, jp.slug AS job_slug, jp.department, jp.location
+       FROM job_applications ja
+       JOIN job_posts jp ON jp.id = ja.job_post_id
+       WHERE ja.id = $1`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Application not found' });
+    res.json({ application: result.rows[0] });
+  } catch (error) {
+    console.error('Get job application error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.patch('/job-applications/:id', authenticateToken, requirePermission('job_applications.view'), async (req, res) => {
+  try {
+    const { status, admin_notes } = req.body || {};
+    const result = await pool.query(
+      `UPDATE job_applications SET
+        status = COALESCE($1, status),
+        admin_notes = COALESCE($2, admin_notes),
+        updated_at = CURRENT_TIMESTAMP
+       WHERE id = $3 RETURNING *`,
+      [status, admin_notes, req.params.id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Application not found' });
+    res.json({ application: result.rows[0], message: 'Application updated' });
+  } catch (error) {
+    console.error('Update job application error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

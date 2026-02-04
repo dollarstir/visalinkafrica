@@ -217,6 +217,18 @@ const WebsiteEditor = () => {
     }
   };
 
+  const handleDeleteBlog = async (post) => {
+    const ok = await showDeleteConfirm('Delete post', `Remove "${post.title}"? This cannot be undone.`);
+    if (!ok) return;
+    try {
+      await apiService.deleteBlogPost(post.id);
+      showSuccess('Post deleted');
+      loadBlogPosts();
+    } catch (err) {
+      showError(err.message || 'Failed to delete post');
+    }
+  };
+
   const handleBlogImageUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -271,7 +283,7 @@ const WebsiteEditor = () => {
     }
   };
 
-  if (!hasPermission(user, 'settings.update') && user?.role !== 'admin') {
+  if (!hasPermission(user, 'website.view') && !hasPermission(user, 'website.update') && user?.role !== 'admin') {
     return <Navigate to="/app" replace />;
   }
 
@@ -517,7 +529,12 @@ const WebsiteEditor = () => {
                       <td className="px-4 py-2 text-sm">{post.status}</td>
                       <td className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">{post.published_at ? new Date(post.published_at).toLocaleDateString() : '—'}</td>
                       <td className="px-4 py-2 text-right">
-                        <button type="button" onClick={() => openBlogModal(post)} className="btn-outline text-sm">Edit</button>
+                        <div className="flex gap-2 justify-end">
+                          <button type="button" onClick={() => openBlogModal(post)} className="btn-outline text-sm">Edit</button>
+                          <button type="button" onClick={() => handleDeleteBlog(post)} className="btn-outline text-sm text-red-600 dark:text-red-400">
+                            <Trash2 className="h-4 w-4 inline" /> Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

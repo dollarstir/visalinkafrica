@@ -21,7 +21,7 @@ router.get('/count', authenticateToken, async (req, res) => {
 });
 
 // List agent applications (admin only)
-router.get('/', authenticateToken, requirePermission('users.view'), async (req, res) => {
+router.get('/', authenticateToken, requirePermission('agent_applications.view'), async (req, res) => {
   try {
     const { status } = req.query;
     let query = `
@@ -47,7 +47,7 @@ router.get('/', authenticateToken, requirePermission('users.view'), async (req, 
 });
 
 // Approve agent application (admin only)
-router.post('/:id/approve', authenticateToken, requirePermission('users.edit'), async (req, res) => {
+router.post('/:id/approve', authenticateToken, requirePermission('agent_applications.view'), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const adminId = req.user.userId;
@@ -84,7 +84,7 @@ router.post('/:id/approve', authenticateToken, requirePermission('users.edit'), 
 });
 
 // Reject agent application (admin only)
-router.post('/:id/reject', authenticateToken, requirePermission('users.edit'), async (req, res) => {
+router.post('/:id/reject', authenticateToken, requirePermission('agent_applications.view'), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     const adminId = req.user.userId;
