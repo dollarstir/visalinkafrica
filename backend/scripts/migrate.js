@@ -262,6 +262,18 @@ const createTables = async () => {
       )
     `);
 
+    // Public website pages (admin-editable corporate site content)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS website_pages (
+        id SERIAL PRIMARY KEY,
+        slug VARCHAR(100) UNIQUE NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        body TEXT,
+        meta_description VARCHAR(500),
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     console.log('All tables created successfully!');
   } catch (error) {
     console.error('Error creating tables:', error);
@@ -338,6 +350,24 @@ const insertSampleData = async () => {
       ('Mike Johnson', 'mike@example.com', '+1 (555) 345-6789', 'Application Submission', '2024-01-17', '09:00:00', '45 minutes', 'confirmed', 'Lisa Davis', 'Office - Room A', 'Final submission of visa application', true)
       ON CONFLICT DO NOTHING
     `);
+
+    // Seed default website pages for corporate site (if not exist)
+    const pageSlugs = ['home', 'about', 'services', 'contact'];
+    const pageData = {
+      home: { title: 'Welcome', body: '<h1>Welcome to VisaLink Africa</h1><p>Your trusted partner for visa and document services across Africa.</p>' },
+      about: { title: 'About Us', body: '<h1>About Us</h1><p>VisaLink Africa provides professional visa application and document services.</p>' },
+      services: { title: 'Our Services', body: '<h1>Our Services</h1><p>We offer visa applications, passport services, and document assistance.</p>' },
+      contact: { title: 'Contact Us', body: '<h1>Contact Us</h1><p>Email: info@visalinkafrica.com</p><p>Phone: +1 (555) 000-0000</p>' }
+    };
+    for (const slug of pageSlugs) {
+      const { title, body } = pageData[slug] || { title: slug, body: '' };
+      await pool.query(
+        `INSERT INTO website_pages (slug, title, body, meta_description)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (slug) DO NOTHING`,
+        [slug, title, body, '']
+      );
+    }
 
     console.log('Sample data inserted successfully!');
   } catch (error) {

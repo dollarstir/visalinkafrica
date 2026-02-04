@@ -37,7 +37,7 @@ const ServiceCategories = () => {
 
   // Check if user has permission to view service categories
   if (!hasPermission(user, 'service_categories.view') && user?.role !== 'admin') {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/app" replace />;
   }
 
   const loadCategories = async () => {

@@ -39,7 +39,7 @@ const Visits = () => {
 
   // Check if user has permission to view visits
   if (!hasPermission(user, 'visits.view') && user?.role !== 'admin') {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/app" replace />;
   }
 
   const loadVisits = async () => {

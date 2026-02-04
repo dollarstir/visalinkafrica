@@ -236,7 +236,7 @@ const Settings = () => {
 
   // Check permission after all hooks
   if (!hasPermission(user, 'settings.view') && user?.role !== 'admin') {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/app" replace />;
   }
 
   if (loading) {

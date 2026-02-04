@@ -6,10 +6,14 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Register
+// Register (public – only user or agent role allowed)
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password, role = 'user', department } = req.body;
+    let { name, email, password, role = 'user', department } = req.body;
+    // Restrict public registration to user or agent only
+    if (!['user', 'agent'].includes(role)) {
+      role = 'user';
+    }
 
     // Check if user already exists
     const existingUser = await pool.query(

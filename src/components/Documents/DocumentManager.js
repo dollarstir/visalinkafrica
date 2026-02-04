@@ -55,7 +55,7 @@ const DocumentManager = () => {
 
   // Check if user has permission to view documents
   if (!hasPermission(user, 'documents.view') && user?.role !== 'admin') {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/app" replace />;
   }
 
   const loadDocuments = async () => {

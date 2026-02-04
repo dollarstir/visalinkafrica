@@ -13,7 +13,8 @@ import {
   BarChart3,
   User,
   X,
-  Shield
+  Shield,
+  Globe
 } from 'lucide-react';
 import { useAuth } from '../Auth/AuthContext';
 import { hasPermission } from '../../utils/permissions';
@@ -23,20 +24,21 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const { user } = useAuth();
 
   const navigation = [
-    { name: 'Dashboard', href: '/', icon: Home, permission: null }, // Always visible
-    { name: 'Applications', href: '/applications', icon: FileText, permission: 'applications.view' },
-    { name: 'Customers', href: '/customers', icon: Users, permission: 'customers.view' },
-    { name: 'Visitors', href: '/visitors', icon: UserCheck, permission: 'visitors.view' },
-    { name: 'Visits', href: '/visits', icon: Calendar, permission: 'visits.view' },
-    { name: 'Appointments', href: '/appointments', icon: Clock, permission: 'appointments.view' },
-    { name: 'Staff', href: '/staff', icon: UserPlus, permission: 'staff.view' },
-    { name: 'Service Categories', href: '/service-categories', icon: FolderOpen, permission: 'service_categories.view' },
-    { name: 'Services', href: '/services', icon: Settings, permission: 'services.view' },
-    { name: 'Reports', href: '/reports', icon: BarChart3, permission: 'reports.view' },
-    { name: 'Documents', href: '/documents', icon: FileText, permission: 'documents.view' },
-    { name: 'Users', href: '/users', icon: Shield, permission: 'users.view' },
-    { name: 'Settings', href: '/settings', icon: Settings, permission: 'settings.view' },
-    { name: 'Profile', href: '/profile', icon: User, permission: null }, // Always visible
+    { name: 'Dashboard', href: '/app', icon: Home, permission: null },
+    { name: 'Applications', href: '/app/applications', icon: FileText, permission: 'applications.view' },
+    { name: 'Customers', href: '/app/customers', icon: Users, permission: 'customers.view' },
+    { name: 'Visitors', href: '/app/visitors', icon: UserCheck, permission: 'visitors.view' },
+    { name: 'Visits', href: '/app/visits', icon: Calendar, permission: 'visits.view' },
+    { name: 'Appointments', href: '/app/appointments', icon: Clock, permission: 'appointments.view' },
+    { name: 'Staff', href: '/app/staff', icon: UserPlus, permission: 'staff.view' },
+    { name: 'Service Categories', href: '/app/service-categories', icon: FolderOpen, permission: 'service_categories.view' },
+    { name: 'Services', href: '/app/services', icon: Settings, permission: 'services.view' },
+    { name: 'Reports', href: '/app/reports', icon: BarChart3, permission: 'reports.view' },
+    { name: 'Documents', href: '/app/documents', icon: FileText, permission: 'documents.view' },
+    { name: 'Users', href: '/app/users', icon: Shield, permission: 'users.view' },
+    { name: 'Website', href: '/app/website', icon: Globe, permission: 'settings.update' },
+    { name: 'Settings', href: '/app/settings', icon: Settings, permission: 'settings.view' },
+    { name: 'Profile', href: '/app/profile', icon: User, permission: null },
   ].filter(item => {
     // Show item if no permission required, or user has the permission, or user is admin
     if (!item.permission) return true;

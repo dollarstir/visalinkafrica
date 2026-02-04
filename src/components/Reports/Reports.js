@@ -69,7 +69,7 @@ const Reports = () => {
 
   // Check if user has permission to view reports
   if (!hasPermission(user, 'reports.view') && user?.role !== 'admin') {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/app" replace />;
   }
 
   const loadReportData = async () => {

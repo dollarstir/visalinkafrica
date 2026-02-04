@@ -137,6 +137,7 @@ app.use('/api/service-categories', require('./routes/serviceCategories'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/documents', require('./routes/documents'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api/website', require('./routes/website'));
 
 // Auto-run database migrations on startup (production only)
 const runMigrationsOnStartup = async () => {

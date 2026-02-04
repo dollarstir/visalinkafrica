@@ -752,6 +752,28 @@ class ApiService {
       body: JSON.stringify({ value })
     });
   }
+
+  // Public website (corporate site) – no auth for GET
+  async getWebsitePages() {
+    const url = `${this.baseURL}/website/pages`;
+    const response = await fetch(url);
+    if (!response.ok) return { pages: [] };
+    return response.json();
+  }
+
+  async getWebsitePage(slug) {
+    const url = `${this.baseURL}/website/pages/${slug}`;
+    const response = await fetch(url);
+    if (!response.ok) return { page: null };
+    return response.json();
+  }
+
+  async updateWebsitePage(slug, data) {
+    return this.request(`/website/pages/${slug}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
 }
 
 // Create and export a singleton instance

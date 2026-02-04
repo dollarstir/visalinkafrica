@@ -40,7 +40,7 @@ const Appointments = () => {
 
   // Check if user has permission to view appointments
   if (!hasPermission(user, 'appointments.view') && user?.role !== 'admin') {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/app" replace />;
   }
 
   const loadAppointments = async () => {

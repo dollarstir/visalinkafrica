@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mail, AlertCircle, CheckCircle } from 'lucide-react';
 import apiService from '../../services/api';
 
@@ -11,6 +12,7 @@ const getLogoUrl = (siteLogo) => {
 };
 
 const Login = ({ onLogin }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -67,12 +69,12 @@ const Login = ({ onLogin }) => {
     setIsLoading(true);
     
     try {
-      // Call the AuthContext login function with credentials
       const result = await onLogin(formData);
-      
-      if (!result.success) {
-        setErrors({ general: result.error });
+      if (result.success) {
+        navigate('/app', { replace: true });
+        return;
       }
+      setErrors({ general: result.error });
     } catch (error) {
       setErrors({ general: error.message || 'Invalid email or password' });
     } finally {
@@ -221,9 +223,14 @@ const Login = ({ onLogin }) => {
         </div>
 
         {/* Footer */}
-        <div className="text-center">
+        <div className="text-center space-y-2">
+          <p>
+            <Link to="/" className="text-sm text-primary-600 dark:text-primary-400 hover:underline">
+              ← Back to website
+            </Link>
+          </p>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            © 2024 VisaLink Africa. All rights reserved.
+            © {new Date().getFullYear()} VisaLink Africa. All rights reserved.
           </p>
         </div>
       </div>
