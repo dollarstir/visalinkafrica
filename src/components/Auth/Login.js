@@ -1,6 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, EyeOff, Lock, Mail, AlertCircle, CheckCircle } from 'lucide-react';
 import apiService from '../../services/api';
+
+const getLogoUrl = (siteLogo) => {
+  if (!siteLogo) return '';
+  if (siteLogo.startsWith('http')) return siteLogo;
+  const apiUrl = process.env.REACT_APP_API_URL || '';
+  const origin = apiUrl ? (() => { try { return new URL(apiUrl).origin; } catch { return ''; } })() : (typeof window !== 'undefined' ? window.location.origin : '');
+  return origin ? `${origin}${siteLogo}` : siteLogo;
+};
 
 const Login = ({ onLogin }) => {
   const [formData, setFormData] = useState({
@@ -10,6 +18,11 @@ const Login = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [siteLogo, setSiteLogo] = useState('');
+
+  useEffect(() => {
+    apiService.getPublicSettings().then((data) => setSiteLogo(data.siteLogo || '')).catch(() => setSiteLogo(''));
+  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -72,8 +85,18 @@ const Login = ({ onLogin }) => {
       <div className="max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-primary-600 dark:bg-primary-500 rounded-full flex items-center justify-center">
-            <span className="text-2xl font-bold text-white">VL</span>
+          <div className="mx-auto h-16 w-20 flex items-center justify-center overflow-hidden">
+            {siteLogo ? (
+              <img
+                src={getLogoUrl(siteLogo)}
+                alt="VisaLink Africa"
+                className="max-h-16 w-auto object-contain"
+              />
+            ) : (
+              <div className="h-16 w-16 bg-primary-600 dark:bg-primary-500 rounded-full flex items-center justify-center">
+                <span className="text-2xl font-bold text-white">VL</span>
+              </div>
+            )}
           </div>
           <h2 className="mt-6 text-3xl font-bold text-gray-900 dark:text-white">
             Welcome to VisaLink Africa

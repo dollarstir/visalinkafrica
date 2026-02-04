@@ -63,6 +63,12 @@ const ensureSettingsTable = async () => {
         ('email', 'from_name', 'VisaLink Africa', 'string', 'Display name for sent emails')
       `);
 
+      // Insert default General/Branding settings (site logo for login/register)
+      await pool.query(`
+        INSERT INTO settings (category, key, value, type, description) VALUES
+        ('general', 'site_logo', '', 'string', 'Website logo URL (shown on login and register pages)')
+      `);
+
       console.log('Settings table created successfully with default values.');
     }
   } catch (error) {
@@ -97,6 +103,17 @@ const loadSettings = async () => {
       }
       settings[row.category][row.key] = parsedValue;
     });
+
+    // Ensure general.site_logo row exists (for existing DBs created before this feature)
+    if (!settings.general || settings.general.site_logo === undefined) {
+      await pool.query(`
+        INSERT INTO settings (category, key, value, type, description)
+        VALUES ('general', 'site_logo', '', 'string', 'Website logo URL (shown on login and register pages)')
+        ON CONFLICT (category, key) DO NOTHING
+      `);
+      if (!settings.general) settings.general = {};
+      settings.general.site_logo = settings.general.site_logo || '';
+    }
 
     settingsCache = settings;
     cacheTimestamp = Date.now();

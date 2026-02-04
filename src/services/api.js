@@ -711,6 +711,30 @@ class ApiService {
     return this.request('/settings');
   }
 
+  /** Public settings (no auth) – for login/register page logo */
+  async getPublicSettings() {
+    const url = `${this.baseURL}/settings/public`;
+    const response = await fetch(url);
+    if (!response.ok) return { siteLogo: '' };
+    return response.json();
+  }
+
+  async uploadSiteLogo(file) {
+    const token = localStorage.getItem('token');
+    const formData = new FormData();
+    formData.append('logo', file);
+    const response = await fetch(`${this.baseURL}/settings/logo`, {
+      method: 'POST',
+      headers: { Authorization: token ? `Bearer ${token}` : '' },
+      body: formData
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to upload logo');
+    }
+    return response.json();
+  }
+
   async getSetting(key) {
     return this.request(`/settings/${key}`);
   }

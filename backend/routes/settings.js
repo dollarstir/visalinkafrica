@@ -1,10 +1,69 @@
 const express = require('express');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const pool = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { requirePermission } = require('../middleware/permissions');
 const settingsService = require('../services/settingsService');
 
 const router = express.Router();
+
+// Logo upload config (for site logo on login/register)
+const uploadsDir = path.join(__dirname, '..', 'uploads');
+const siteLogoDir = path.join(uploadsDir, 'site-logo');
+if (!fs.existsSync(siteLogoDir)) {
+  fs.mkdirSync(siteLogoDir, { recursive: true });
+}
+const logoStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, siteLogoDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.png';
+    cb(null, `logo${ext}`);
+  }
+});
+const logoUpload = multer({
+  storage: logoStorage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image files are allowed for the logo'));
+    }
+    cb(null, true);
+  }
+});
+
+// Public settings (no auth) – for login/register page logo
+router.get('/public', async (req, res) => {
+  try {
+    const siteLogo = await settingsService.getSetting('general', 'site_logo', '');
+    res.json({ siteLogo: siteLogo || '' });
+  } catch (error) {
+    console.error('Get public settings error:', error);
+    res.status(500).json({ siteLogo: '' });
+  }
+});
+
+// Upload site logo (admin only)
+router.post('/logo', authenticateToken, requirePermission('settings.update'), logoUpload.single('logo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No logo file uploaded' });
+    }
+    const relativePath = `/uploads/site-logo/${req.file.filename}`;
+    await pool.query(
+      `INSERT INTO settings (category, key, value, type, description)
+       VALUES ('general', 'site_logo', $1, 'string', 'Website logo URL (shown on login and register pages)')
+       ON CONFLICT (category, key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+      [relativePath]
+    );
+    settingsService.invalidateCache();
+    res.json({ message: 'Logo updated successfully', siteLogo: relativePath });
+  } catch (error) {
+    console.error('Upload logo error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Get all settings (admin only)
 router.get('/', authenticateToken, requirePermission('settings.view'), async (req, res) => {

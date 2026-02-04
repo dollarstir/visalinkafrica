@@ -11,7 +11,8 @@ import {
   AlertCircle,
   CheckCircle,
   FileText,
-  Settings2
+  Settings2,
+  Image
 } from 'lucide-react';
 import apiService from '../../services/api';
 import { showSuccess, showError } from '../../utils/toast';
@@ -49,10 +50,14 @@ const Settings = () => {
     }
   });
   const [errors, setErrors] = useState({});
-  const [activeTab, setActiveTab] = useState('configuration'); // 'configuration' or 'templates'
+  const [activeTab, setActiveTab] = useState('general'); // 'general' | 'configuration' | 'templates'
+  const [siteLogo, setSiteLogo] = useState('');
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoInputRef = React.useRef(null);
 
   useEffect(() => {
     loadSettings();
+    apiService.getPublicSettings().then((data) => setSiteLogo(data.siteLogo || '')).catch(() => setSiteLogo(''));
   }, []);
 
   const loadSettings = async () => {
@@ -91,6 +96,35 @@ const Settings = () => {
       showError('Failed to load settings');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getLogoUrl = (logoPath) => {
+    if (!logoPath) return '';
+    if (logoPath.startsWith('http')) return logoPath;
+    const apiUrl = process.env.REACT_APP_API_URL || '';
+    const origin = apiUrl ? (() => { try { return new URL(apiUrl).origin; } catch { return ''; } })() : (typeof window !== 'undefined' ? window.location.origin : '');
+    return origin ? `${origin}${logoPath}` : logoPath;
+  };
+
+  const handleLogoClick = () => logoInputRef.current?.click();
+  const handleLogoChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      showError('Please select an image file (e.g. PNG, JPG)');
+      return;
+    }
+    try {
+      setLogoUploading(true);
+      const result = await apiService.uploadSiteLogo(file);
+      setSiteLogo(result.siteLogo || '');
+      showSuccess('Logo updated successfully. It will appear on the login and register pages.');
+    } catch (err) {
+      showError(err.message || 'Failed to upload logo');
+    } finally {
+      setLogoUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -276,6 +310,19 @@ const Settings = () => {
       <div className="border-b border-gray-200 dark:border-gray-700">
         <nav className="-mb-px flex space-x-8">
           <button
+            onClick={() => setActiveTab('general')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'general'
+                ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <Image className="h-4 w-4" />
+              <span>General</span>
+            </div>
+          </button>
+          <button
             onClick={() => setActiveTab('configuration')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'configuration'
@@ -303,6 +350,49 @@ const Settings = () => {
           </button>
         </nav>
       </div>
+
+      {/* General Tab - Site logo */}
+      {activeTab === 'general' && (
+        <div className="card dark:bg-gray-800 dark:border-gray-700">
+          <div className="flex items-center mb-6">
+            <Image className="h-6 w-6 text-primary-600 dark:text-primary-400 mr-3" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Website Logo</h2>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            This logo appears on the login and register pages. Recommended: PNG or JPG, max 2MB.
+          </p>
+          <div className="flex items-center gap-4">
+            <div className="h-20 flex items-center justify-center overflow-hidden bg-gray-100 dark:bg-gray-700 rounded-lg px-4 min-w-[120px]">
+              {siteLogo ? (
+                <img
+                  src={getLogoUrl(siteLogo)}
+                  alt="Site logo"
+                  className="max-h-16 w-auto object-contain"
+                />
+              ) : (
+                <span className="text-gray-400 dark:text-gray-500 text-sm">No logo</span>
+              )}
+            </div>
+            <div>
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleLogoChange}
+              />
+              <button
+                type="button"
+                onClick={handleLogoClick}
+                disabled={logoUploading}
+                className="btn-primary disabled:opacity-50"
+              >
+                {logoUploading ? 'Uploading...' : 'Upload logo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Configuration Tab */}
       {activeTab === 'configuration' && (
