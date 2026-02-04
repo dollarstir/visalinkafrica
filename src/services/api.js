@@ -781,6 +781,11 @@ class ApiService {
     return this.request(`/agent-applications${qs ? `?${qs}` : ''}`);
   }
 
+  async getAgentApplicationsCount(status = 'pending') {
+    const res = await this.request(`/agent-applications/count?status=${encodeURIComponent(status)}`);
+    return res.count ?? 0;
+  }
+
   async approveAgentApplication(id) {
     return this.request(`/agent-applications/${id}/approve`, { method: 'POST' });
   }

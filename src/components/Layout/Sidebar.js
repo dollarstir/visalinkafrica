@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { 
   Home, 
@@ -17,11 +17,21 @@ import {
   Globe
 } from 'lucide-react';
 import { useAuth } from '../Auth/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import { hasPermission } from '../../utils/permissions';
+import apiService from '../../services/api';
 
 const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
   const location = useLocation();
   const { user } = useAuth();
+  const { unreadCount } = useNotifications();
+  const [pendingAgentCount, setPendingAgentCount] = useState(0);
+
+  // Fetch pending agent applications count (for badge); refetch when notifications or route change
+  useEffect(() => {
+    if (!user || !hasPermission(user, 'users.view')) return;
+    apiService.getAgentApplicationsCount('pending').then(setPendingAgentCount).catch(() => setPendingAgentCount(0));
+  }, [user, unreadCount, location.pathname]);
 
   const navigation = [
     { name: 'Dashboard', href: '/app', icon: Home, permission: null },
@@ -36,7 +46,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     { name: 'Reports', href: '/app/reports', icon: BarChart3, permission: 'reports.view' },
     { name: 'Documents', href: '/app/documents', icon: FileText, permission: 'documents.view' },
     { name: 'Users', href: '/app/users', icon: Shield, permission: 'users.view' },
-    { name: 'Agent applications', href: '/app/agent-applications', icon: UserCheck, permission: 'users.view' },
+    { name: 'Agent applications', href: '/app/agent-applications', icon: UserCheck, permission: 'users.view', badgeKey: 'agent-applications' },
     { name: 'Website', href: '/app/website', icon: Globe, permission: 'settings.update' },
     { name: 'Settings', href: '/app/settings', icon: Settings, permission: 'settings.view' },
     { name: 'Profile', href: '/app/profile', icon: User, permission: null },
@@ -104,7 +114,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
                     mr-3 h-5 w-5 flex-shrink-0
                     ${isActive ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-500 dark:group-hover:text-gray-300'}
                   `} />
-                  {item.name}
+                  <span className="flex-1">{item.name}</span>
+                  {item.badgeKey === 'agent-applications' && pendingAgentCount > 0 && (
+                    <span className="ml-auto inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold rounded-full bg-primary-600 text-white dark:bg-primary-500">
+                      {pendingAgentCount > 99 ? '99+' : pendingAgentCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}

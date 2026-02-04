@@ -63,10 +63,11 @@ const ensureSettingsTable = async () => {
         ('email', 'from_name', 'VisaLink Africa', 'string', 'Display name for sent emails')
       `);
 
-      // Insert default General/Branding settings (site logo for login/register)
+      // Insert default General/Branding settings (site logo, support phone for SMS alerts)
       await pool.query(`
         INSERT INTO settings (category, key, value, type, description) VALUES
-        ('general', 'site_logo', '', 'string', 'Website logo URL (shown on login and register pages)')
+        ('general', 'site_logo', '', 'string', 'Website logo URL (shown on login and register pages)'),
+        ('general', 'support_phone', '', 'string', 'Admin support phone number to receive SMS alerts (e.g. new agent applications)')
       `);
 
       console.log('Settings table created successfully with default values.');
@@ -104,15 +105,23 @@ const loadSettings = async () => {
       settings[row.category][row.key] = parsedValue;
     });
 
-    // Ensure general.site_logo row exists (for existing DBs created before this feature)
-    if (!settings.general || settings.general.site_logo === undefined) {
+    // Ensure general.site_logo and general.support_phone rows exist (for existing DBs)
+    if (!settings.general) settings.general = {};
+    if (settings.general.site_logo === undefined) {
       await pool.query(`
         INSERT INTO settings (category, key, value, type, description)
         VALUES ('general', 'site_logo', '', 'string', 'Website logo URL (shown on login and register pages)')
         ON CONFLICT (category, key) DO NOTHING
       `);
-      if (!settings.general) settings.general = {};
       settings.general.site_logo = settings.general.site_logo || '';
+    }
+    if (settings.general.support_phone === undefined) {
+      await pool.query(`
+        INSERT INTO settings (category, key, value, type, description)
+        VALUES ('general', 'support_phone', '', 'string', 'Admin support phone for SMS alerts (e.g. new agent applications)')
+        ON CONFLICT (category, key) DO NOTHING
+      `);
+      settings.general.support_phone = settings.general.support_phone || '';
     }
 
     settingsCache = settings;

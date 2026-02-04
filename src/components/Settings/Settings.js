@@ -25,6 +25,9 @@ const Settings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
+    general: {
+      support_phone: ''
+    },
     sms: {
       enabled: false,
       api_key: '',
@@ -67,6 +70,9 @@ const Settings = () => {
       const loadedSettings = response.settings || {};
 
       setSettings({
+        general: {
+          support_phone: loadedSettings.general?.support_phone?.value || ''
+        },
         sms: {
           enabled: loadedSettings.sms?.enabled?.value === 'true' || loadedSettings.sms?.enabled?.value === true,
           api_key: loadedSettings.sms?.api_key?.value || '',
@@ -202,6 +208,8 @@ const Settings = () => {
 
       // Prepare settings array for API
       const settingsArray = [
+        // General
+        { key: 'general.support_phone', value: settings.general?.support_phone ?? '' },
         // SMS settings
         { key: 'sms.enabled', value: settings.sms.enabled.toString() },
         { key: 'sms.api_key', value: settings.sms.api_key },
@@ -390,6 +398,20 @@ const Settings = () => {
                 {logoUploading ? 'Uploading...' : 'Upload logo'}
               </button>
             </div>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Support phone (SMS alerts)</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              Phone number to receive SMS when someone applies to become an agent (e.g. 0241234567). Requires SMS to be enabled in Configuration.
+            </p>
+            <input
+              type="text"
+              value={settings.general?.support_phone ?? ''}
+              onChange={(e) => handleInputChange('general', 'support_phone', e.target.value)}
+              className="input-field dark:bg-gray-700 dark:border-gray-600 dark:text-white max-w-md"
+              placeholder="e.g. 0241234567"
+            />
           </div>
         </div>
       )}

@@ -5,6 +5,21 @@ const { requirePermission } = require('../middleware/permissions');
 
 const router = express.Router();
 
+// Pending count (for sidebar badge) – auth required
+router.get('/count', authenticateToken, async (req, res) => {
+  try {
+    const { status = 'pending' } = req.query;
+    const result = await pool.query(
+      'SELECT COUNT(*)::int AS count FROM agent_applications WHERE status = $1',
+      [status]
+    );
+    res.json({ count: result.rows[0]?.count ?? 0 });
+  } catch (error) {
+    console.error('Agent applications count error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // List agent applications (admin only)
 router.get('/', authenticateToken, requirePermission('users.view'), async (req, res) => {
   try {

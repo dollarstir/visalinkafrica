@@ -3,6 +3,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const notificationService = require('../services/notificationService');
+const smsService = require('../services/smsService');
+const settingsService = require('../services/settingsService');
 
 const router = express.Router();
 
@@ -39,10 +42,31 @@ router.post('/register', async (req, res) => {
     delete user.password;
 
     if (role === 'agent') {
-      await pool.query(
-        'INSERT INTO agent_applications (user_id, status) VALUES ($1, $2)',
+      const appResult = await pool.query(
+        'INSERT INTO agent_applications (user_id, status) VALUES ($1, $2) RETURNING id',
         [user.id, 'pending']
       );
+      const applicationId = appResult.rows[0]?.id;
+
+      // Notify admins via WebSocket
+      const notification = notificationService.createNotification(
+        'info',
+        'New agent application',
+        `${name} (${email}) requested to become an agent.`,
+        { type: 'agent_application', applicationId, userId: user.id, name, email }
+      );
+      notificationService.notifyRole('admin', notification);
+
+      // SMS to support number if set and SMS enabled
+      try {
+        const supportPhone = await settingsService.getSetting('general', 'support_phone', '');
+        if (supportPhone && supportPhone.trim()) {
+          const message = `VisaLink: New agent application from ${name} (${email}). Please check Agent applications in the CRM.`;
+          await smsService.sendSMS(supportPhone.trim(), message);
+        }
+      } catch (smsErr) {
+        console.error('SMS alert for agent application failed:', smsErr);
+      }
     }
 
     const token = jwt.sign(
