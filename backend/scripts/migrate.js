@@ -274,6 +274,20 @@ const createTables = async () => {
       )
     `);
 
+    // Agent applications: user requests to become agent; admin approves/rejects
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS agent_applications (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reviewed_at TIMESTAMP,
+        reviewed_by INTEGER REFERENCES users(id),
+        UNIQUE(user_id)
+      )
+    `);
+
     console.log('All tables created successfully!');
   } catch (error) {
     console.error('Error creating tables:', error);

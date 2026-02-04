@@ -46,11 +46,16 @@ const RegisterAgentPage = () => {
         role: 'agent',
         department: formData.department || 'Agent'
       });
-      localStorage.setItem('token', response.token);
-      localStorage.setItem('visaLink_user', JSON.stringify(response.user));
-      showSuccess('Registration successful. You can now log in to the CRM.');
-      navigate('/app', { replace: true });
-      window.location.reload(); // Refresh so AuthContext picks up the user
+      if (response.agentApplicationPending) {
+        showSuccess('Application submitted. An admin will review your request. You can log in; agent features will be available after approval.');
+        navigate('/login', { replace: true });
+      } else {
+        localStorage.setItem('token', response.token);
+        localStorage.setItem('visaLink_user', JSON.stringify(response.user));
+        showSuccess('Registration successful. You can now log in to the CRM.');
+        navigate('/app', { replace: true });
+        window.location.reload();
+      }
     } catch (err) {
       showError(err.message || 'Registration failed');
     } finally {
@@ -63,7 +68,7 @@ const RegisterAgentPage = () => {
       <div className="max-w-md mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 md:p-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Register to become an agent</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-          Create your agent account to access the VisaLink Africa CRM.
+          Apply to become an agent. After you submit, an admin will review your application. You can log in once approved.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">

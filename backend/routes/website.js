@@ -36,32 +36,48 @@ router.get('/pages/:slug', async (req, res) => {
   }
 });
 
-// Admin: update or create page (auth + settings permission)
+// Shared handler: update or create a page by slug
+async function upsertPage(slug, { title, body, meta_description }) {
+  const updateResult = await pool.query(
+    `UPDATE website_pages
+     SET title = COALESCE($1, title), body = COALESCE($2, body), meta_description = COALESCE($3, meta_description), updated_at = CURRENT_TIMESTAMP
+     WHERE slug = $4
+     RETURNING slug, title, body, meta_description, updated_at`,
+    [title || null, body !== undefined ? body : null, meta_description !== undefined ? meta_description : null, slug]
+  );
+  if (updateResult.rows.length > 0) {
+    return { page: updateResult.rows[0], message: 'Page updated successfully' };
+  }
+  const insertResult = await pool.query(
+    `INSERT INTO website_pages (slug, title, body, meta_description)
+     VALUES ($1, $2, $3, $4)
+     RETURNING slug, title, body, meta_description, updated_at`,
+    [slug, title || slug, body !== undefined ? body : '', meta_description !== undefined ? meta_description : '']
+  );
+  return { page: insertResult.rows[0], message: 'Page created successfully' };
+}
+
+// Admin: update or create page by slug in URL (PUT /pages/:slug)
 router.put('/pages/:slug', authenticateToken, requirePermission('settings.update'), async (req, res) => {
   try {
-    const { slug } = req.params;
-    const { title, body, meta_description } = req.body;
+    const slug = req.params.slug;
+    const result = await upsertPage(slug, req.body);
+    res.json(result);
+  } catch (error) {
+    console.error('Update website page error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-    const updateResult = await pool.query(
-      `UPDATE website_pages
-       SET title = COALESCE($1, title), body = COALESCE($2, body), meta_description = COALESCE($3, meta_description), updated_at = CURRENT_TIMESTAMP
-       WHERE slug = $4
-       RETURNING slug, title, body, meta_description, updated_at`,
-      [title || null, body !== undefined ? body : null, meta_description !== undefined ? meta_description : null, slug]
-    );
-
-    if (updateResult.rows.length > 0) {
-      return res.json({ page: updateResult.rows[0], message: 'Page updated successfully' });
+// Admin: update or create page by slug in body (PUT /pages) – fallback when URL path is wrong
+router.put('/pages', authenticateToken, requirePermission('settings.update'), async (req, res) => {
+  try {
+    const slug = req.body.slug;
+    if (!slug || typeof slug !== 'string') {
+      return res.status(400).json({ error: 'slug is required in request body' });
     }
-
-    // Page doesn't exist – insert (upsert)
-    const insertResult = await pool.query(
-      `INSERT INTO website_pages (slug, title, body, meta_description)
-       VALUES ($1, $2, $3, $4)
-       RETURNING slug, title, body, meta_description, updated_at`,
-      [slug, title || slug, body !== undefined ? body : '', meta_description !== undefined ? meta_description : '']
-    );
-    res.json({ page: insertResult.rows[0], message: 'Page created successfully' });
+    const result = await upsertPage(slug.trim(), req.body);
+    res.json(result);
   } catch (error) {
     console.error('Update website page error:', error);
     res.status(500).json({ error: 'Internal server error' });

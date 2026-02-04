@@ -24,6 +24,7 @@ import DocumentManager from './components/Documents/DocumentManager';
 import Users from './components/Users/Users';
 import Settings from './components/Settings/Settings';
 import WebsiteEditor from './components/Website/WebsiteEditor';
+import AgentApplications from './components/AgentApplications/AgentApplications';
 import PublicLayout from './components/Website/PublicLayout';
 import HomePage from './components/Website/HomePage';
 import AboutPage from './components/Website/AboutPage';
@@ -84,6 +85,7 @@ function App() {
                 <Route path="reports" element={<Reports />} />
                 <Route path="documents" element={<DocumentManager />} />
                 <Route path="users" element={<Users />} />
+                <Route path="agent-applications" element={<AgentApplications />} />
                 <Route path="settings" element={<Settings />} />
                 <Route path="website" element={<WebsiteEditor />} />
               </Route>

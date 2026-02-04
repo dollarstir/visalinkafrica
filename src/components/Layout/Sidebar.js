@@ -36,6 +36,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     { name: 'Reports', href: '/app/reports', icon: BarChart3, permission: 'reports.view' },
     { name: 'Documents', href: '/app/documents', icon: FileText, permission: 'documents.view' },
     { name: 'Users', href: '/app/users', icon: Shield, permission: 'users.view' },
+    { name: 'Agent applications', href: '/app/agent-applications', icon: UserCheck, permission: 'users.view' },
     { name: 'Website', href: '/app/website', icon: Globe, permission: 'settings.update' },
     { name: 'Settings', href: '/app/settings', icon: Settings, permission: 'settings.view' },
     { name: 'Profile', href: '/app/profile', icon: User, permission: null },

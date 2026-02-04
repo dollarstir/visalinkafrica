@@ -769,9 +769,26 @@ class ApiService {
   }
 
   async updateWebsitePage(slug, data) {
-    return this.request(`/website/pages/${slug}`, {
+    return this.request('/website/pages', {
       method: 'PUT',
-      body: JSON.stringify(data)
+      body: JSON.stringify({ slug, ...data })
+    });
+  }
+
+  // Agent applications (admin: list, approve, reject)
+  async getAgentApplications(params = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return this.request(`/agent-applications${qs ? `?${qs}` : ''}`);
+  }
+
+  async approveAgentApplication(id) {
+    return this.request(`/agent-applications/${id}/approve`, { method: 'POST' });
+  }
+
+  async rejectAgentApplication(id, message) {
+    return this.request(`/agent-applications/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ message })
     });
   }
 }

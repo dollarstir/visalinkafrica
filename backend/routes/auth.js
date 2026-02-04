@@ -6,16 +6,15 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Register (public – only user or agent role allowed)
+// Register (public – only user or agent-applicant)
+// When role is 'agent', user is created as 'user' and an agent_application (pending) is created; admin must approve.
 router.post('/register', async (req, res) => {
   try {
     let { name, email, password, role = 'user', department } = req.body;
-    // Restrict public registration to user or agent only
     if (!['user', 'agent'].includes(role)) {
       role = 'user';
     }
 
-    // Check if user already exists
     const existingUser = await pool.query(
       'SELECT id FROM users WHERE email = $1',
       [email]
@@ -25,20 +24,27 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Hash password
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Create user
+    // If they applied as agent, create as user and add pending agent application
+    const createRole = role === 'agent' ? 'user' : role;
+
     const result = await pool.query(
       'INSERT INTO users (name, email, password, role, department) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role, department, created_at',
-      [name, email, hashedPassword, role, department]
+      [name, email, hashedPassword, createRole, department || (role === 'agent' ? 'Agent' : null)]
     );
 
     const user = result.rows[0];
     delete user.password;
 
-    // Generate JWT token
+    if (role === 'agent') {
+      await pool.query(
+        'INSERT INTO agent_applications (user_id, status) VALUES ($1, $2)',
+        [user.id, 'pending']
+      );
+    }
+
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET,
@@ -46,9 +52,12 @@ router.post('/register', async (req, res) => {
     );
 
     res.status(201).json({
-      message: 'User created successfully',
+      message: role === 'agent'
+        ? 'Application submitted. An admin will review your request to become an agent.'
+        : 'User created successfully',
       user,
-      token
+      token,
+      agentApplicationPending: role === 'agent'
     });
   } catch (error) {
     console.error('Registration error:', error);
