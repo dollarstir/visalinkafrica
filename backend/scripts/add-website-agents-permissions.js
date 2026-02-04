@@ -12,6 +12,10 @@ async function addWebsiteAgentsPermissions() {
   try {
     console.log('Adding website and agents permissions...');
 
+    // Ensure permissions table has name and category columns (older DBs may only have code, description)
+    await pool.query('ALTER TABLE permissions ADD COLUMN IF NOT EXISTS name VARCHAR(255)');
+    await pool.query('ALTER TABLE permissions ADD COLUMN IF NOT EXISTS category VARCHAR(100)');
+
     for (const perm of NEW_PERMISSIONS) {
       const existing = await pool.query(
         'SELECT id FROM permissions WHERE code = $1',
