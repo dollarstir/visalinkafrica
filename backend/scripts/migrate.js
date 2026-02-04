@@ -1,4 +1,5 @@
 const pool = require('../config/database');
+const bcrypt = require('bcryptjs');
 
 const createTables = async () => {
   try {
@@ -338,6 +339,17 @@ const insertSampleData = async () => {
       ('Mike Johnson', 'mike@example.com', '+1 (555) 345-6789', 'Application Submission', '2024-01-17', '09:00:00', '45 minutes', 'confirmed', 'Lisa Davis', 'Office - Room A', 'Final submission of visa application', true)
       ON CONFLICT DO NOTHING
     `);
+
+    // Ensure default admin user exists (email: admin@visalink.com, password: Admin@123)
+    const adminCheck = await pool.query('SELECT id FROM users WHERE email = $1', ['admin@visalink.com']);
+    if (adminCheck.rows.length === 0) {
+      const hashedPassword = await bcrypt.hash('Admin@123', 10);
+      await pool.query(
+        `INSERT INTO users (name, email, password, role, department) VALUES ($1, $2, $3, $4, $5)`,
+        ['System Administrator', 'admin@visalink.com', hashedPassword, 'admin', 'Administration']
+      );
+      console.log('Default admin user created (admin@visalink.com / Admin@123)');
+    }
 
     console.log('Sample data inserted successfully!');
   } catch (error) {
