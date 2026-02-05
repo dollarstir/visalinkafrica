@@ -6,17 +6,26 @@ import apiService from '../../services/api';
 
 const HomePage = () => {
   const [sections, setSections] = useState([]);
+  const [homePage, setHomePage] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    apiService
-      .getPageSections('home')
-      .then((data) => {
-        if (!cancelled) setSections(data.sections || []);
+    Promise.all([
+      apiService.getPageSections('home'),
+      apiService.getWebsitePage('home')
+    ])
+      .then(([sectionsData, pageData]) => {
+        if (!cancelled) {
+          setSections(sectionsData.sections || []);
+          setHomePage(pageData.page || null);
+        }
       })
       .catch(() => {
-        if (!cancelled) setSections([]);
+        if (!cancelled) {
+          setSections([]);
+          setHomePage(null);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -32,6 +41,8 @@ const HomePage = () => {
         { id: 1, block_type: 'agent_cta', block_props: { title: 'Become an Agent', subtitle: 'Join our network and grow your business.', button_text: 'Apply Now', button_link: '/register-agent' } }
       ];
 
+  const hasHomeBody = homePage && homePage.body && homePage.body.trim().replace(/<[^>]+>/g, '').trim().length > 0;
+
   return (
     <>
       <ImageSlider pageSlug="home" />
@@ -41,9 +52,22 @@ const HomePage = () => {
           <p className="mt-3 text-sm font-medium text-gray-500 dark:text-gray-400">Loading...</p>
         </div>
       ) : (
-        displaySections.map((section) => (
-          <SectionRenderer key={section.id} section={section} />
-        ))
+        <>
+          {displaySections.map((section) => (
+            <SectionRenderer key={section.id} section={section} />
+          ))}
+          {/* Content from Admin → Website → Pages → Home (so homepage shows what you edit there) */}
+          {hasHomeBody && (
+            <section className="py-20 md:py-24 bg-slate-50 dark:bg-gray-800/50">
+              <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
+                <div
+                  className="prose prose-lg dark:prose-invert max-w-none prose-headings:tracking-tight prose-p:leading-relaxed text-gray-600 dark:text-gray-300"
+                  dangerouslySetInnerHTML={{ __html: homePage.body }}
+                />
+              </div>
+            </section>
+          )}
+        </>
       )}
       <section className="py-10 bg-slate-100 dark:bg-gray-800/80 border-t border-slate-200 dark:border-gray-700">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl text-center">

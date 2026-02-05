@@ -16,6 +16,7 @@ import {
 import NewServiceModal from './NewServiceModal';
 import EditServiceModal from './EditServiceModal';
 import ViewServiceModal from './ViewServiceModal';
+import CustomerServices from './CustomerServices';
 import apiService from '../../services/api';
 import { showSuccess, showError, showDeleteConfirm } from '../../utils/toast';
 import { formatPrice } from '../../utils/currency';
@@ -25,6 +26,10 @@ import { Navigate } from 'react-router-dom';
 
 const Services = () => {
   const { user } = useAuth();
+
+  if (user?.role === 'customer') {
+    return <CustomerServices />;
+  }
   const [showNewServiceModal, setShowNewServiceModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');

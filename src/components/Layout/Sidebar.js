@@ -34,7 +34,14 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     apiService.getAgentApplicationsCount('pending').then(setPendingAgentCount).catch(() => setPendingAgentCount(0));
   }, [user, unreadCount, location.pathname]);
 
-  const navigation = [
+  const customerNavigation = [
+    { name: 'Dashboard', href: '/app', icon: Home, permission: null },
+    { name: 'Services', href: '/app/services', icon: Settings, permission: null },
+    { name: 'My Applications', href: '/app/applications', icon: FileText, permission: null },
+    { name: 'Profile', href: '/app/profile', icon: User, permission: null },
+  ];
+
+  const navigation = (user?.role === 'customer' ? customerNavigation : [
     { name: 'Dashboard', href: '/app', icon: Home, permission: null },
     { name: 'Applications', href: '/app/applications', icon: FileText, permission: 'applications.view' },
     { name: 'Customers', href: '/app/customers', icon: Users, permission: 'customers.view' },
@@ -53,7 +60,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }) => {
     { name: 'Job Applications', href: '/app/job-applications', icon: Briefcase, permission: 'job_applications.view' },
     { name: 'Settings', href: '/app/settings', icon: Settings, permission: 'settings.view' },
     { name: 'Profile', href: '/app/profile', icon: User, permission: null },
-  ].filter(item => {
+  ]).filter(item => {
     // Show item if no permission required, or user has the permission, or user is admin
     if (!item.permission) return true;
     if (user?.role === 'admin') return true;

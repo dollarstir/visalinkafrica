@@ -79,6 +79,7 @@ const createTables = async () => {
     await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS notes TEXT`);
     await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'active'`);
     await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS agent_user_id INTEGER REFERENCES users(id)`);
+    await pool.query(`ALTER TABLE customers ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL`);
 
     // Applications table
     await pool.query(`
@@ -99,6 +100,7 @@ const createTables = async () => {
       )
     `);
     await pool.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS agent_user_id INTEGER REFERENCES users(id)`);
+    await pool.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS application_source VARCHAR(50) DEFAULT 'staff'`);
 
     // Visitors table
     await pool.query(`
@@ -482,8 +484,8 @@ const insertSampleData = async () => {
     for (const s of homeSections) {
       await pool.query(
         `INSERT INTO website_page_sections (page_slug, block_type, block_props, sort_order, is_active)
-         SELECT $1, $2, $3::jsonb, $4, true
-         WHERE NOT EXISTS (SELECT 1 FROM website_page_sections WHERE page_slug = $1 AND block_type = $2 AND sort_order = $4)`,
+         SELECT $1::varchar, $2::varchar, $3::jsonb, $4::integer, true
+         WHERE NOT EXISTS (SELECT 1 FROM website_page_sections WHERE page_slug = $1::varchar AND block_type = $2::varchar AND sort_order = $4::integer)`,
         ['home', s.block_type, JSON.stringify(s.block_props), s.sort_order]
       );
     }

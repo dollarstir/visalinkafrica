@@ -57,6 +57,12 @@ const PublicLayout = () => {
               ))}
               <div className="ml-2 flex items-center gap-2 pl-2 border-l border-gray-200 dark:border-gray-700">
                 <Link
+                  to="/register"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-xl transition-colors"
+                >
+                  Create account
+                </Link>
+                <Link
                   to="/register-agent"
                   className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-soft hover:shadow-card transition-all duration-200"
                 >
@@ -74,6 +80,9 @@ const PublicLayout = () => {
             </nav>
 
             <div className="flex items-center gap-2 md:hidden">
+              <Link to="/register" className="btn-outline text-sm py-2 px-3 rounded-lg">
+                Create account
+              </Link>
               <Link to="/register-agent" className="btn-primary text-sm py-2 px-3 rounded-lg flex items-center gap-2">
                 <UserPlus className="h-4 w-4" />
                 Become an agent

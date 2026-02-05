@@ -80,8 +80,19 @@ router.get('/', authenticateToken, async (req, res) => {
       shouldFilterByAgent = true;
     }
 
+    // If user is customer (portal), only show their own applications (via linked customer record)
+    let customerIdForUser = null;
+    if (userRole === 'customer') {
+      const custResult = await pool.query('SELECT id FROM customers WHERE user_id = $1', [userId]);
+      if (custResult.rows.length > 0) {
+        customerIdForUser = custResult.rows[0].id;
+      } else {
+        return res.json({ applications: [], pagination: { page: 1, limit: parseInt(limit, 10), total: 0, pages: 0 } });
+      }
+    }
+
     let query = `
-      SELECT a.id, a.customer_id, a.service_id, a.staff_id, a.agent_user_id, a.status, a.priority, a.documents, 
+      SELECT a.id, a.customer_id, a.service_id, a.staff_id, a.agent_user_id, a.application_source, a.status, a.priority, a.documents, 
              a.notes, a.estimated_completion_date, a.actual_completion_date, 
              a.created_at, a.updated_at,
              c.first_name, c.last_name, c.email, c.phone,
@@ -97,6 +108,12 @@ router.get('/', authenticateToken, async (req, res) => {
     `;
     const queryParams = [];
     let paramCount = 0;
+
+    if (userRole === 'customer' && customerIdForUser) {
+      paramCount++;
+      query += ` AND a.customer_id = $${paramCount}`;
+      queryParams.push(customerIdForUser);
+    }
 
     // If user is staff without view permission, only show their assigned applications
     if (shouldFilterByStaff) {
@@ -143,6 +160,12 @@ router.get('/', authenticateToken, async (req, res) => {
     `;
     const countParams = [];
     let countParamCount = 0;
+
+    if (userRole === 'customer' && customerIdForUser) {
+      countParamCount++;
+      countQuery += ` AND a.customer_id = $${countParamCount}`;
+      countParams.push(customerIdForUser);
+    }
 
     // If user is staff without view permission, only count their assigned applications
     if (shouldFilterByStaff) {
@@ -237,6 +260,14 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     const application = result.rows[0];
 
+    // If user is customer, only allow viewing their own applications
+    if (userRole === 'customer') {
+      const custResult = await pool.query('SELECT id FROM customers WHERE user_id = $1', [userId]);
+      if (custResult.rows.length === 0 || application.customer_id !== custResult.rows[0].id) {
+        return res.status(403).json({ error: 'Access denied. This application is not yours.' });
+      }
+    }
+
     // If staff doesn't have view permission, check if application is assigned to them
     if (shouldFilterByStaff && application.staff_id !== staffId) {
       return res.status(403).json({ error: 'Access denied. This application is not assigned to you.' });
@@ -259,7 +290,7 @@ router.post('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
     const userRole = req.user.role;
-    const {
+    let {
       customer_id,
       service_id,
       staff_id,
@@ -270,15 +301,31 @@ router.post('/', authenticateToken, async (req, res) => {
       estimated_completion_date
     } = req.body;
 
+    // Customer (portal self-service): use their linked customer record and set source to self-applied
+    if (userRole === 'customer') {
+      if (!service_id) {
+        return res.status(400).json({ error: 'service_id is required' });
+      }
+      const custResult = await pool.query('SELECT id FROM customers WHERE user_id = $1', [userId]);
+      if (custResult.rows.length === 0) {
+        return res.status(400).json({ error: 'No customer profile linked to your account. Please contact support.' });
+      }
+      customer_id = custResult.rows[0].id;
+      staff_id = null;
+      status = 'draft';
+      estimated_completion_date = null;
+    }
+
     // For agents, force status to 'draft' and ignore estimated_completion_date; set agent_user_id
     const effectiveStatus = userRole === 'agent' ? 'draft' : status;
     const effectiveEstimatedDate = userRole === 'agent' ? null : estimated_completion_date;
     const agentUserId = userRole === 'agent' ? userId : null;
+    const applicationSource = userRole === 'customer' ? 'self-applied' : (userRole === 'agent' ? 'agent' : 'staff');
 
-    const insertQuery = `INSERT INTO applications (customer_id, service_id, staff_id, agent_user_id, status, priority, documents, notes, estimated_completion_date)
-                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    const insertQuery = `INSERT INTO applications (customer_id, service_id, staff_id, agent_user_id, application_source, status, priority, documents, notes, estimated_completion_date)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                          RETURNING *`;
-    const insertParams = [customer_id, service_id, staff_id, agentUserId, effectiveStatus, priority, documents, notes, effectiveEstimatedDate];
+    const insertParams = [customer_id, service_id, staff_id, agentUserId, applicationSource, effectiveStatus, priority, documents || null, notes || null, effectiveEstimatedDate];
 
     const result = await pool.query(insertQuery, insertParams);
     const application = result.rows[0];
@@ -288,7 +335,7 @@ router.post('/', authenticateToken, async (req, res) => {
       // Get customer details for SMS
       const customerResult = await pool.query(
         'SELECT first_name, last_name, phone FROM customers WHERE id = $1',
-        [customer_id]
+        [application.customer_id]
       );
       const serviceResult = await pool.query(
         'SELECT name FROM services WHERE id = $1',
@@ -376,9 +423,12 @@ router.post('/', authenticateToken, async (req, res) => {
 // Update application
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
-    const { id } = req.params;
     const userId = req.user.userId;
     const userRole = req.user.role;
+    if (userRole === 'customer') {
+      return res.status(403).json({ error: 'Customers cannot update applications. Contact support for changes.' });
+    }
+    const { id } = req.params;
     const {
       customer_id,
       service_id,
@@ -531,6 +581,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
 // Delete application
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
+    if (req.user.role === 'customer') {
+      return res.status(403).json({ error: 'Customers cannot delete applications.' });
+    }
     const { id } = req.params;
 
     const result = await pool.query(

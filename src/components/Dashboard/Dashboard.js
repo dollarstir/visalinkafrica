@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { 
   FileText, 
   Users, 
   Calendar, 
   Clock, 
-  UserPlus
+  UserPlus,
+  Settings,
+  ArrowRight
 } from 'lucide-react';
 import apiService from '../../services/api';
 import { useAuth } from '../Auth/AuthContext';
@@ -20,6 +22,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentStaffId, setCurrentStaffId] = useState(null);
+  const [customerAppCount, setCustomerAppCount] = useState(null);
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -41,8 +44,15 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
+    if (user?.role === 'customer') {
+      apiService.getApplications({ page: 1, limit: 1 })
+        .then((r) => setCustomerAppCount(r.pagination?.total ?? 0))
+        .catch(() => setCustomerAppCount(0));
+      setLoading(false);
+      return;
+    }
     loadDashboardData();
-  }, []);
+  }, [user?.role]);
 
   // Load current staff ID for logged-in staff user
   useEffect(() => {
@@ -297,6 +307,50 @@ const Dashboard = () => {
       setLoading(false);
     }
   };
+
+  // Customer portal dashboard
+  if (user?.role === 'customer') {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Your portal</h1>
+          <p className="text-gray-600 dark:text-gray-400">Welcome, {user?.name || 'Customer'}. Manage your services and applications here.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Link
+            to="/app/applications"
+            className="card dark:bg-gray-800 dark:border-gray-700 hover:shadow-card transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400">
+                <FileText className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">My Applications</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{customerAppCount ?? '—'} application(s)</p>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-primary-600 dark:group-hover:text-primary-400" />
+          </Link>
+          <Link
+            to="/app/services"
+            className="card dark:bg-gray-800 dark:border-gray-700 hover:shadow-card transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-400">
+                <Settings className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Services</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Browse and apply for services</p>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-primary-600 dark:group-hover:text-primary-400" />
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

@@ -82,6 +82,9 @@ router.get('/pages', async (req, res) => {
   }
 });
 
+const KNOWN_PAGE_SLUGS = ['home', 'about', 'services', 'contact'];
+const DEFAULT_PAGE_TITLES = { home: 'Welcome', about: 'About Us', services: 'Our Services', contact: 'Contact Us' };
+
 router.get('/pages/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
@@ -89,10 +92,22 @@ router.get('/pages/:slug', async (req, res) => {
       'SELECT slug, title, body, meta_description, updated_at FROM website_pages WHERE slug = $1',
       [slug]
     );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Page not found' });
+    if (result.rows.length > 0) {
+      return res.json({ page: result.rows[0] });
     }
-    res.json({ page: result.rows[0] });
+    // Return a default page for known slugs so About/Services/Contact never 404 (admin can then edit and save)
+    if (KNOWN_PAGE_SLUGS.includes(slug)) {
+      return res.json({
+        page: {
+          slug,
+          title: DEFAULT_PAGE_TITLES[slug] || slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+          body: '',
+          meta_description: '',
+          updated_at: new Date().toISOString()
+        }
+      });
+    }
+    return res.status(404).json({ error: 'Page not found' });
   } catch (error) {
     console.error('Get website page error:', error);
     res.status(500).json({ error: 'Internal server error' });

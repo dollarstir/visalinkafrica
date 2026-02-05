@@ -33,6 +33,7 @@ import AboutPage from './components/Website/AboutPage';
 import ServicesPage from './components/Website/ServicesPage';
 import ContactPage from './components/Website/ContactPage';
 import RegisterAgentPage from './components/Website/RegisterAgentPage';
+import RegisterPage from './components/Website/RegisterPage';
 import BlogListPage from './components/Website/BlogListPage';
 import BlogPostPage from './components/Website/BlogPostPage';
 import CareersPage from './components/Website/CareersPage';
@@ -78,6 +79,7 @@ function App() {
                 <Route path="careers" element={<CareersPage />} />
                 <Route path="careers/:slug" element={<JobPostPage />} />
                 <Route path="contact" element={<ContactPage />} />
+                <Route path="register" element={<RegisterPage />} />
                 <Route path="register-agent" element={<RegisterAgentPage />} />
               </Route>
               <Route path="/login" element={<LoginRoute />} />

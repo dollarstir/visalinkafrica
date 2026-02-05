@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Plus, 
   Search, 
@@ -8,7 +9,8 @@ import {
   FileText,
   Calendar,
   User,
-  AlertCircle
+  AlertCircle,
+  Settings
 } from 'lucide-react';
 import apiService from '../../services/api';
 import { showSuccess, showError, showDeleteConfirm } from '../../utils/toast';
@@ -360,16 +362,24 @@ const Applications = () => {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Applications</h1>
-          <p className="text-gray-600">
-            {user?.role === 'agent'
-              ? 'Create and manage applications for your customers'
-              : 'Manage all customer applications and their status'}
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Applications</h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            {user?.role === 'customer'
+              ? 'Your applications. Apply for services from the Services page.'
+              : user?.role === 'agent'
+                ? 'Create and manage applications for your customers'
+                : 'Manage all customer applications and their status'}
           </p>
         </div>
-        {(hasPermission(user, 'applications.create') || user?.role === 'agent') && (
+        {user?.role === 'customer' && (
+          <Link to="/app/services" className="btn-primary flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            <span>Browse & apply for services</span>
+          </Link>
+        )}
+        {(hasPermission(user, 'applications.create') || user?.role === 'agent') && user?.role !== 'customer' && (
           <button
             onClick={() => setShowNewApplicationModal(true)}
             className="btn-primary flex items-center space-x-2"
@@ -572,10 +582,10 @@ const Applications = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
-                      {(hasPermission(user, 'applications.view') || user?.role === 'agent') && (
+                      {(hasPermission(user, 'applications.view') || user?.role === 'agent' || user?.role === 'customer') && (
                         <button 
                           onClick={() => handleViewApplication(app)}
-                          className="text-primary-600 hover:text-primary-900"
+                          className="text-primary-600 hover:text-primary-900 dark:text-primary-400 dark:hover:text-primary-300"
                           title="View Application"
                         >
                           <Eye className="h-4 w-4" />

@@ -9,12 +9,13 @@ const settingsService = require('../services/settingsService');
 
 const router = express.Router();
 
-// Register (public – only user or agent-applicant)
+// Register (public – user, agent-applicant, or customer)
 // When role is 'agent', user is created as 'user' and an agent_application (pending) is created; admin must approve.
+// When role is 'customer', user is created as 'customer' and a customer record is linked (for portal self-service).
 router.post('/register', async (req, res) => {
   try {
-    let { name, email, password, role = 'user', department } = req.body;
-    if (!['user', 'agent'].includes(role)) {
+    let { name, email, password, role = 'user', department, phone } = req.body;
+    if (!['user', 'agent', 'customer'].includes(role)) {
       role = 'user';
     }
 
@@ -34,12 +35,24 @@ router.post('/register', async (req, res) => {
     const createRole = role === 'agent' ? 'user' : role;
 
     const result = await pool.query(
-      'INSERT INTO users (name, email, password, role, department) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, email, role, department, created_at',
-      [name, email, hashedPassword, createRole, department || (role === 'agent' ? 'Agent' : null)]
+      'INSERT INTO users (name, email, password, role, department, phone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, email, role, department, created_at',
+      [name, email, hashedPassword, createRole, department || (role === 'agent' ? 'Agent' : null), role === 'customer' ? (phone || null) : null]
     );
 
     const user = result.rows[0];
     delete user.password;
+
+    if (role === 'customer') {
+      const parts = (name || '').trim().split(/\s+/);
+      const first_name = parts[0] || name || 'Customer';
+      const last_name = parts.slice(1).join(' ') || '';
+      await pool.query(
+        `INSERT INTO customers (first_name, last_name, email, phone, user_id)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (email) DO UPDATE SET user_id = $5, first_name = $1, last_name = $2, phone = COALESCE(customers.phone, $4)`,
+        [first_name, last_name, email, phone || null, user.id]
+      );
+    }
 
     if (role === 'agent') {
       const appResult = await pool.query(
