@@ -19,6 +19,15 @@ router.post('/register', async (req, res) => {
       role = 'user';
     }
 
+    // Customer must provide phone for welcome SMS
+    if (role === 'customer') {
+      const phoneStr = (phone != null && typeof phone === 'string') ? phone.trim() : '';
+      if (!phoneStr) {
+        return res.status(400).json({ error: 'Phone number is required for customer registration. We send a welcome SMS to this number.' });
+      }
+      phone = phoneStr;
+    }
+
     const existingUser = await pool.query(
       'SELECT id FROM users WHERE email = $1',
       [email]
@@ -52,6 +61,13 @@ router.post('/register', async (req, res) => {
          ON CONFLICT (email) DO UPDATE SET user_id = $5, first_name = $1, last_name = $2, phone = COALESCE(customers.phone, $4)`,
         [first_name, last_name, email, phone || null, user.id]
       );
+      // Send welcome SMS (async, don't block response)
+      const customerName = `${first_name} ${last_name}`.trim() || name || 'Customer';
+      if (phone) {
+        smsService.notifyCustomerCreated(phone, customerName).catch(err => {
+          console.error('Failed to send customer welcome SMS:', err);
+        });
+      }
     }
 
     if (role === 'agent') {

@@ -23,6 +23,7 @@ const Dashboard = () => {
   const [error, setError] = useState(null);
   const [currentStaffId, setCurrentStaffId] = useState(null);
   const [customerAppCount, setCustomerAppCount] = useState(null);
+  const [customerStatusBreakdown, setCustomerStatusBreakdown] = useState(null);
 
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
@@ -45,9 +46,30 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (user?.role === 'customer') {
-      apiService.getApplications({ page: 1, limit: 1 })
-        .then((r) => setCustomerAppCount(r.pagination?.total ?? 0))
-        .catch(() => setCustomerAppCount(0));
+      apiService.getApplications({ page: 1, limit: 500, status: 'all' })
+        .then((r) => {
+          const apps = r.applications || [];
+          setCustomerAppCount(r.pagination?.total ?? apps.length);
+          const breakdown = {
+            draft: 0,
+            pending: 0,
+            under_review: 0,
+            submitted: 0,
+            approved: 0,
+            rejected: 0,
+            total: apps.length
+          };
+          apps.forEach((app) => {
+            const s = (app.status || 'draft').toLowerCase().replace(/\s/g, '_');
+            if (breakdown[s] !== undefined) breakdown[s]++;
+            else breakdown.draft++;
+          });
+          setCustomerStatusBreakdown(breakdown);
+        })
+        .catch(() => {
+          setCustomerAppCount(0);
+          setCustomerStatusBreakdown({ draft: 0, pending: 0, under_review: 0, submitted: 0, approved: 0, rejected: 0, total: 0 });
+        });
       setLoading(false);
       return;
     }
@@ -308,30 +330,37 @@ const Dashboard = () => {
     }
   };
 
-  // Customer portal dashboard
+  // Customer portal dashboard: breakdown by status + quick links
   if (user?.role === 'customer') {
+    const breakdown = customerStatusBreakdown || { draft: 0, pending: 0, under_review: 0, submitted: 0, approved: 0, rejected: 0, total: 0 };
+    const statusCards = [
+      { key: 'total', label: 'Total', value: breakdown.total, color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' },
+      { key: 'draft', label: 'Draft', value: breakdown.draft, color: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' },
+      { key: 'pending', label: 'Pending', value: breakdown.pending, color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
+      { key: 'under_review', label: 'In review', value: breakdown.under_review, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
+      { key: 'submitted', label: 'Submitted', value: breakdown.submitted, color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
+      { key: 'approved', label: 'Approved', value: breakdown.approved, color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
+      { key: 'rejected', label: 'Rejected', value: breakdown.rejected, color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
+    ];
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Your portal</h1>
-          <p className="text-gray-600 dark:text-gray-400">Welcome, {user?.name || 'Customer'}. Manage your services and applications here.</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Your dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-400">Welcome, {user?.name || 'Customer'}. Here’s the breakdown of your applications.</p>
+        </div>
+        {/* Applications by status */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Applications by status</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
+            {statusCards.map(({ key, label, value, color }) => (
+              <div key={key} className="card dark:bg-gray-800 dark:border-gray-700 text-center py-4">
+                <div className={`inline-block px-2 py-1 text-sm font-semibold rounded-full ${color}`}>{value}</div>
+                <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">{label}</div>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Link
-            to="/app/applications"
-            className="card dark:bg-gray-800 dark:border-gray-700 hover:shadow-card transition-all flex items-center justify-between group"
-          >
-            <div className="flex items-center gap-4">
-              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400">
-                <FileText className="h-6 w-6" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">My Applications</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{customerAppCount ?? '—'} application(s)</p>
-              </div>
-            </div>
-            <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-primary-600 dark:group-hover:text-primary-400" />
-          </Link>
           <Link
             to="/app/services"
             className="card dark:bg-gray-800 dark:border-gray-700 hover:shadow-card transition-all flex items-center justify-between group"
@@ -343,6 +372,21 @@ const Dashboard = () => {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Services</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Browse and apply for services</p>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-primary-600 dark:group-hover:text-primary-400" />
+          </Link>
+          <Link
+            to="/app/applications"
+            className="card dark:bg-gray-800 dark:border-gray-700 hover:shadow-card transition-all flex items-center justify-between group"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400">
+                <FileText className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">My Applications</h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{customerAppCount ?? '—'} application(s) · View or create</p>
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-primary-600 dark:group-hover:text-primary-400" />

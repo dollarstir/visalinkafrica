@@ -71,7 +71,12 @@ const Login = ({ onLogin }) => {
     try {
       const result = await onLogin(formData);
       if (result.success) {
-        navigate('/app', { replace: true });
+        // Customers go straight to Services; others to Dashboard
+        if (result.user?.role === 'customer') {
+          navigate('/app/services', { replace: true });
+        } else {
+          navigate('/app', { replace: true });
+        }
         return;
       }
       setErrors({ general: result.error });

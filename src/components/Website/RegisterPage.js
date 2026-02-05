@@ -27,6 +27,7 @@ const RegisterPage = () => {
     if (!formData.name.trim()) newErrors.name = 'Name is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
+    if (!formData.phone.trim()) newErrors.phone = 'Phone number is required. We send a welcome SMS to this number.';
     if (!formData.password) newErrors.password = 'Password is required';
     else if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
     if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
@@ -44,7 +45,7 @@ const RegisterPage = () => {
         email: formData.email.trim(),
         password: formData.password,
         role: 'customer',
-        phone: formData.phone.trim() || undefined
+        phone: formData.phone.trim()
       });
       localStorage.setItem('token', response.token);
       localStorage.setItem('visaLink_user', JSON.stringify(response.user));
@@ -111,16 +112,18 @@ const RegisterPage = () => {
           </div>
 
           <div>
-            <label className="label">Phone (optional)</label>
+            <label className="label">Phone number</label>
             <input
               type="tel"
               name="phone"
               value={formData.phone}
               onChange={handleChange}
-              className="input-field"
-              placeholder="+1234567890"
+              className={`input-field ${errors.phone ? 'border-red-500' : ''}`}
+              placeholder="e.g. 0241234567 or +233241234567"
               disabled={loading}
             />
+            {errors.phone && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>}
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">We’ll send a welcome SMS to this number.</p>
           </div>
 
           <div>
