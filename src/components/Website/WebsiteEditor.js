@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Save, AlertCircle, Image, BookOpen, Briefcase, Plus, Edit, Trash2, X } from 'lucide-react';
+import { FileText, Save, AlertCircle, Image, BookOpen, Briefcase, Plus, Edit, Trash2, X, LayoutGrid, ChevronUp, ChevronDown } from 'lucide-react';
 import apiService from '../../services/api';
 import { showSuccess, showError, showDeleteConfirm } from '../../utils/toast';
 import { useAuth } from '../Auth/AuthContext';
@@ -16,9 +16,18 @@ const WEBSITE_SLUGS = [
 
 const TABS = [
   { id: 'pages', label: 'Pages', icon: FileText },
+  { id: 'builder', label: 'Page Builder', icon: LayoutGrid },
   { id: 'slider', label: 'Slider', icon: Image },
   { id: 'blog', label: 'Blog', icon: BookOpen },
   { id: 'jobs', label: 'Jobs', icon: Briefcase },
+];
+
+const SECTION_TYPES = [
+  { value: 'hero', label: 'Hero (main banner)' },
+  { value: 'features', label: 'Features grid' },
+  { value: 'text', label: 'Text / HTML' },
+  { value: 'cta', label: 'Call to action' },
+  { value: 'agent_cta', label: 'Become an agent CTA' },
 ];
 
 const WebsiteEditor = () => {
@@ -49,15 +58,28 @@ const WebsiteEditor = () => {
   const [editingJobId, setEditingJobId] = useState(null);
   const [jobForm, setJobForm] = useState({ title: '', slug: '', department: '', location: '', employment_type: '', description: '', requirements: '', how_to_apply: '', application_deadline: '', status: 'draft' });
 
+  // Page builder (sections)
+  const [sections, setSections] = useState([]);
+  const [builderPageSlug, setBuilderPageSlug] = useState('home');
+  const [showSectionModal, setShowSectionModal] = useState(false);
+  const [editingSectionId, setEditingSectionId] = useState(null);
+  const [sectionForm, setSectionForm] = useState({ page_slug: 'home', block_type: 'hero', block_props: {}, sort_order: 0, is_active: true });
+  const [savingSection, setSavingSection] = useState(false);
+
   useEffect(() => {
     loadPages();
   }, []);
 
   useEffect(() => {
+    if (activeTab === 'builder') loadSections();
     if (activeTab === 'slider') loadSlides();
     if (activeTab === 'blog') loadBlogPosts();
     if (activeTab === 'jobs') loadJobs();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'builder' && builderPageSlug) loadSections();
+  }, [builderPageSlug]);
 
   const loadPages = async () => {
     try {
@@ -97,6 +119,86 @@ const WebsiteEditor = () => {
       setJobs(data.jobs || []);
     } catch (err) {
       showError(err.message || 'Failed to load jobs');
+    }
+  };
+
+  const loadSections = async () => {
+    try {
+      const data = await apiService.getWebsiteSections(builderPageSlug);
+      setSections(data.sections || []);
+    } catch (err) {
+      showError(err.message || 'Failed to load sections');
+      setSections([]);
+    }
+  };
+
+  const openSectionModal = (section = null) => {
+    if (section) {
+      setEditingSectionId(section.id);
+      setSectionForm({
+        page_slug: section.page_slug || 'home',
+        block_type: section.block_type || 'hero',
+        block_props: section.block_props || {},
+        sort_order: section.sort_order ?? 0,
+        is_active: section.is_active !== false
+      });
+    } else {
+      setEditingSectionId(null);
+      setSectionForm({
+        page_slug: builderPageSlug,
+        block_type: 'hero',
+        block_props: {},
+        sort_order: sections.length,
+        is_active: true
+      });
+    }
+    setShowSectionModal(true);
+  };
+
+  const handleSaveSection = async () => {
+    try {
+      setSavingSection(true);
+      const payload = { ...sectionForm, block_props: sectionForm.block_props };
+      if (editingSectionId) {
+        await apiService.updateWebsiteSection(editingSectionId, payload);
+        showSuccess('Section updated');
+      } else {
+        await apiService.createWebsiteSection(payload);
+        showSuccess('Section added');
+      }
+      setShowSectionModal(false);
+      loadSections();
+    } catch (err) {
+      showError(err.message || 'Failed to save section');
+    } finally {
+      setSavingSection(false);
+    }
+  };
+
+  const handleDeleteSection = async (sec) => {
+    const ok = await showDeleteConfirm('Delete section', `Remove this "${sec.block_type}" section?`);
+    if (!ok) return;
+    try {
+      await apiService.deleteWebsiteSection(sec.id);
+      showSuccess('Section deleted');
+      loadSections();
+    } catch (err) {
+      showError(err.message || 'Failed to delete');
+    }
+  };
+
+  const handleMoveSection = async (index, direction) => {
+    const newOrder = [...sections];
+    const swap = direction === 'up' ? index - 1 : index + 1;
+    if (swap < 0 || swap >= newOrder.length) return;
+    [newOrder[index], newOrder[swap]] = [newOrder[swap], newOrder[index]];
+    const sectionIds = newOrder.map((s) => s.id);
+    try {
+      await apiService.reorderWebsiteSections(builderPageSlug, sectionIds);
+      showSuccess('Order updated');
+      loadSections();
+    } catch (err) {
+      showError(err.message || 'Failed to reorder');
     }
   };
 
@@ -402,6 +504,57 @@ const WebsiteEditor = () => {
         </div>
       )}
 
+      {/* Page Builder tab */}
+      {activeTab === 'builder' && (
+        <div className="space-y-6">
+          <div className="card dark:bg-gray-800 dark:border-gray-700">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Page:</label>
+                <select
+                  value={builderPageSlug}
+                  onChange={(e) => setBuilderPageSlug(e.target.value)}
+                  className="input-field dark:bg-gray-700 dark:border-gray-600 dark:text-white w-40"
+                >
+                  {WEBSITE_SLUGS.map(({ slug, label }) => (
+                    <option key={slug} value={slug}>{label}</option>
+                  ))}
+                </select>
+              </div>
+              <button type="button" onClick={() => openSectionModal()} className="btn-primary flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Add section
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+              Drag order: move sections with the arrows. First section appears at top; put &quot;Become an agent&quot; last.
+            </p>
+            {sections.length === 0 ? (
+              <p className="text-gray-500 dark:text-gray-400 py-6">No sections yet. Add one to build the page.</p>
+            ) : (
+              <ul className="space-y-2">
+                {sections.map((sec, index) => (
+                  <li key={sec.id} className="flex items-center gap-2 p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600">
+                    <div className="flex flex-col gap-0">
+                      <button type="button" onClick={() => handleMoveSection(index, 'up')} disabled={index === 0} className="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-400 disabled:opacity-40" title="Move up"><ChevronUp className="h-4 w-4" /></button>
+                      <button type="button" onClick={() => handleMoveSection(index, 'down')} disabled={index === sections.length - 1} className="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-400 disabled:opacity-40" title="Move down"><ChevronDown className="h-4 w-4" /></button>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-gray-900 dark:text-white capitalize">{sec.block_type.replace('_', ' ')}</span>
+                      {sec.block_props?.title && <span className="text-gray-500 dark:text-gray-400 ml-2">— {String(sec.block_props.title).slice(0, 40)}{sec.block_props.title?.length > 40 ? '...' : ''}</span>}
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button type="button" onClick={() => openSectionModal(sec)} className="btn-outline text-sm"><Edit className="h-4 w-4" /></button>
+                      <button type="button" onClick={() => handleDeleteSection(sec)} className="btn-outline text-sm text-red-600 dark:text-red-400"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Slider tab */}
       {activeTab === 'slider' && (
         <div className="space-y-6">
@@ -583,6 +736,71 @@ const WebsiteEditor = () => {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Section (Page Builder) modal */}
+      {showSectionModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setShowSectionModal(false)} />
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{editingSectionId ? 'Edit section' : 'Add section'}</h3>
+                <button type="button" onClick={() => setShowSectionModal(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="h-5 w-5" /></button>
+              </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Page</label>
+                    <select value={sectionForm.page_slug} onChange={(e) => setSectionForm((p) => ({ ...p, page_slug: e.target.value }))} className="input-field w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                      {WEBSITE_SLUGS.map(({ slug, label }) => <option key={slug} value={slug}>{label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Section type</label>
+                    <select value={sectionForm.block_type} onChange={(e) => setSectionForm((p) => ({ ...p, block_type: e.target.value, block_props: {} }))} className="input-field w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                      {SECTION_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                  </div>
+                </div>
+                {sectionForm.block_type === 'hero' && (
+                  <>
+                    <div><label className="label">Title</label><input type="text" value={sectionForm.block_props?.title || ''} onChange={(e) => setSectionForm((p) => ({ ...p, block_props: { ...p.block_props, title: e.target.value } }))} className="input-field w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="e.g. Our Services" /></div>
+                    <div><label className="label">Subtitle</label><input type="text" value={sectionForm.block_props?.subtitle || ''} onChange={(e) => setSectionForm((p) => ({ ...p, block_props: { ...p.block_props, subtitle: e.target.value } }))} className="input-field w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" /></div>
+                    <div className="grid grid-cols-2 gap-4"><div><label className="label">Button text</label><input type="text" value={sectionForm.block_props?.cta_text || ''} onChange={(e) => setSectionForm((p) => ({ ...p, block_props: { ...p.block_props, cta_text: e.target.value } }))} className="input-field w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" /></div><div><label className="label">Button link</label><input type="text" value={sectionForm.block_props?.cta_link || ''} onChange={(e) => setSectionForm((p) => ({ ...p, block_props: { ...p.block_props, cta_link: e.target.value } }))} className="input-field w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="/services" /></div></div>
+                  </>
+                )}
+                {sectionForm.block_type === 'features' && (
+                  <>
+                    <div><label className="label">Section title</label><input type="text" value={sectionForm.block_props?.title || ''} onChange={(e) => setSectionForm((p) => ({ ...p, block_props: { ...p.block_props, title: e.target.value } }))} className="input-field w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="e.g. Why Choose Us" /></div>
+                    <div><label className="label">Items (one per line: Title | Description)</label><textarea value={(sectionForm.block_props?.items || []).map((i) => `${i.title || ''}|${i.description || ''}`).join('\n')} onChange={(e) => { const lines = e.target.value.split('\n').filter(Boolean); const items = lines.map((line) => { const [title, description] = line.split('|').map((s) => s.trim()); return { title: title || '', description: description || '' }; }); setSectionForm((p) => ({ ...p, block_props: { ...p.block_props, items } })); }} rows={5} className="input-field w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="Expert Support | Dedicated team..." /></div>
+                  </>
+                )}
+                {sectionForm.block_type === 'text' && (
+                  <>
+                    <div><label className="label">Title</label><input type="text" value={sectionForm.block_props?.title || ''} onChange={(e) => setSectionForm((p) => ({ ...p, block_props: { ...p.block_props, title: e.target.value } }))} className="input-field w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" /></div>
+                    <div><label className="label">Content (HTML)</label><RichTextEditor value={sectionForm.block_props?.content || ''} onChange={(v) => setSectionForm((p) => ({ ...p, block_props: { ...p.block_props, content: v } }))} minHeight={180} /></div>
+                  </>
+                )}
+                {(sectionForm.block_type === 'cta' || sectionForm.block_type === 'agent_cta') && (
+                  <>
+                    <div><label className="label">Title</label><input type="text" value={sectionForm.block_props?.title || ''} onChange={(e) => setSectionForm((p) => ({ ...p, block_props: { ...p.block_props, title: e.target.value } }))} className="input-field w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" /></div>
+                    <div><label className="label">Subtitle</label><input type="text" value={sectionForm.block_props?.subtitle || ''} onChange={(e) => setSectionForm((p) => ({ ...p, block_props: { ...p.block_props, subtitle: e.target.value } }))} className="input-field w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" /></div>
+                    <div className="grid grid-cols-2 gap-4"><div><label className="label">Button text</label><input type="text" value={sectionForm.block_props?.button_text || ''} onChange={(e) => setSectionForm((p) => ({ ...p, block_props: { ...p.block_props, button_text: e.target.value } }))} className="input-field w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" /></div><div><label className="label">Button link</label><input type="text" value={sectionForm.block_props?.button_link || ''} onChange={(e) => setSectionForm((p) => ({ ...p, block_props: { ...p.block_props, button_link: e.target.value } }))} className="input-field w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" placeholder="/contact or /register-agent" /></div></div>
+                  </>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div><label className="label">Order</label><input type="number" value={sectionForm.sort_order} onChange={(e) => setSectionForm((p) => ({ ...p, sort_order: parseInt(e.target.value, 10) || 0 }))} className="input-field w-full dark:bg-gray-700 dark:border-gray-600 dark:text-white" /></div>
+                  <div className="flex items-center gap-2 pt-6"><input type="checkbox" id="section-active" checked={sectionForm.is_active} onChange={(e) => setSectionForm((p) => ({ ...p, is_active: e.target.checked }))} className="rounded border-gray-300 dark:border-gray-600" /><label htmlFor="section-active" className="text-sm text-gray-700 dark:text-gray-300">Active (visible on site)</label></div>
+                </div>
+                <div className="flex justify-end gap-2 pt-4">
+                  <button type="button" onClick={() => setShowSectionModal(false)} className="btn-outline">Cancel</button>
+                  <button type="button" onClick={handleSaveSection} disabled={savingSection} className="btn-primary">{savingSection ? 'Saving...' : 'Save section'}</button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

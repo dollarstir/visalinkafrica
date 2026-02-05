@@ -6,6 +6,23 @@ module.exports = {
   darkMode: 'class',
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Plus Jakarta Sans', 'system-ui', '-apple-system', 'sans-serif'],
+      },
+      fontSize: {
+        'display': ['2.75rem', { lineHeight: '1.15', letterSpacing: '-0.02em' }],
+        'display-lg': ['3.5rem', { lineHeight: '1.1', letterSpacing: '-0.025em' }],
+      },
+      boxShadow: {
+        'soft': '0 2px 15px -3px rgb(0 0 0 / 0.07), 0 10px 20px -2px rgb(0 0 0 / 0.04)',
+        'card': '0 4px 6px -1px rgb(0 0 0 / 0.05), 0 10px 15px -3px rgb(0 0 0 / 0.05)',
+        'card-hover': '0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.04)',
+        'glow': '0 0 40px -10px rgb(37 99 235 / 0.35)',
+      },
+      borderRadius: {
+        '2xl': '1rem',
+        '3xl': '1.5rem',
+      },
       colors: {
         primary: {
           50: '#eff6ff',
@@ -31,7 +48,7 @@ module.exports = {
           800: '#1e293b',
           900: '#0f172a',
         }
-      }
+      },
     },
   },
   plugins: [],

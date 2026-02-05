@@ -64,10 +64,10 @@ const RegisterAgentPage = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-      <div className="max-w-md mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 md:p-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Register to become an agent</h1>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-lg py-16 md:py-24">
+      <div className="max-w-md mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-card border border-slate-200/80 dark:border-gray-700 p-6 md:p-8">
+        <h1 className="section-heading text-2xl md:text-3xl mb-2">Register to become an agent</h1>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
           Apply to become an agent. After you submit, an admin will review your application. You can log in once approved.
         </p>
 

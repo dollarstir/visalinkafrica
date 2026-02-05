@@ -47,16 +47,16 @@ const ImageSlider = ({ pageSlug = 'home', intervalMs = 6000, className = '' }) =
           alt={slide.title || 'Slide'}
           className="absolute inset-0 w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-black/40" />
-        <div className="absolute inset-0 flex items-center justify-center text-center px-4">
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+        <div className="absolute inset-0 flex items-end justify-center text-center px-4 pb-12 md:pb-16 lg:pb-20">
           <div className="max-w-3xl">
             {slide.title && (
-              <h2 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg mb-2">
+              <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white tracking-tight drop-shadow-lg mb-3">
                 {slide.title}
               </h2>
             )}
             {slide.subtitle && (
-              <p className="text-lg md:text-xl text-white/95 drop-shadow">
+              <p className="text-lg md:text-xl text-white/95 drop-shadow mb-6 max-w-2xl mx-auto">
                 {slide.subtitle}
               </p>
             )}
@@ -64,9 +64,10 @@ const ImageSlider = ({ pageSlug = 'home', intervalMs = 6000, className = '' }) =
               <Link
                 to={slide.link_url.startsWith('/') ? slide.link_url : '#'}
                 href={slide.link_url.startsWith('http') ? slide.link_url : undefined}
-                className="inline-block mt-4 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors"
+                className="inline-flex items-center gap-2 px-6 py-3.5 bg-white text-gray-900 font-semibold rounded-xl shadow-card hover:shadow-card-hover transition-all duration-200"
               >
                 Learn more
+                <ChevronRight className="h-5 w-5" />
               </Link>
             )}
           </div>
@@ -76,26 +77,26 @@ const ImageSlider = ({ pageSlug = 'home', intervalMs = 6000, className = '' }) =
             <button
               type="button"
               onClick={() => setIndex((i) => (i - 1 + slides.length) % slides.length)}
-              className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+              className="absolute left-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 transition-all duration-200 border border-white/20"
               aria-label="Previous slide"
             >
-              <ChevronLeft className="h-8 w-8" />
+              <ChevronLeft className="h-6 w-6" />
             </button>
             <button
               type="button"
               onClick={() => setIndex((i) => (i + 1) % slides.length)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 transition-all duration-200 border border-white/20"
               aria-label="Next slide"
             >
-              <ChevronRight className="h-8 w-8" />
+              <ChevronRight className="h-6 w-6" />
             </button>
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
               {slides.map((_, i) => (
                 <button
                   key={i}
                   type="button"
                   onClick={() => setIndex(i)}
-                  className={`w-2.5 h-2.5 rounded-full transition-colors ${i === index ? 'bg-white' : 'bg-white/50 hover:bg-white/70'}`}
+                  className={`h-2 rounded-full transition-all duration-200 ${i === index ? 'w-8 bg-white' : 'w-2 bg-white/50 hover:bg-white/70'}`}
                   aria-label={`Go to slide ${i + 1}`}
                 />
               ))}

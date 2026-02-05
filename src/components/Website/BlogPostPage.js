@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import apiService from '../../services/api';
 
 const getImageUrl = (url) => {
@@ -31,17 +32,20 @@ const BlogPostPage = () => {
 
   if (loading) {
     return (
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-        <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl py-20 text-center">
+        <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" aria-hidden />
+        <p className="mt-3 text-sm font-medium text-gray-500 dark:text-gray-400">Loading...</p>
       </div>
     );
   }
 
   if (error || !post) {
     return (
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-        <p className="text-red-600 dark:text-red-400">{error || 'Post not found'}</p>
-        <Link to="/blog" className="mt-4 inline-block text-primary-600 dark:text-primary-400 hover:underline">Back to Blog</Link>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
+        <p className="text-red-600 dark:text-red-400 font-medium">{error || 'Post not found'}</p>
+        <Link to="/blog" className="mt-4 inline-flex items-center gap-2 text-primary-600 dark:text-primary-400 hover:underline font-medium">
+          <ArrowLeft className="h-4 w-4" /> Back to Blog
+        </Link>
       </div>
     );
   }
@@ -49,25 +53,25 @@ const BlogPostPage = () => {
   const imgUrl = getImageUrl(post.featured_image);
 
   return (
-    <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-      <Link to="/blog" className="text-primary-600 dark:text-primary-400 hover:underline text-sm mb-6 inline-block">
-        ← Back to Blog
+    <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl py-16 md:py-24">
+      <Link to="/blog" className="inline-flex items-center gap-2 text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline mb-8">
+        <ArrowLeft className="h-4 w-4" /> Back to Blog
       </Link>
-      <article className="max-w-3xl mx-auto">
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">{post.title}</h1>
-        <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+      <article>
+        <h1 className="section-heading mb-3">{post.title}</h1>
+        <p className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-8">
           {post.published_at ? new Date(post.published_at).toLocaleDateString(undefined, { dateStyle: 'long' }) : ''}
         </p>
         {imgUrl && (
-          <div className="aspect-video rounded-xl overflow-hidden mb-8 bg-gray-200 dark:bg-gray-700">
+          <div className="aspect-video rounded-2xl overflow-hidden mb-8 bg-slate-100 dark:bg-gray-700">
             <img src={imgUrl} alt="" className="w-full h-full object-cover" />
           </div>
         )}
         {post.excerpt && (
-          <p className="text-lg text-gray-600 dark:text-gray-300 mb-6">{post.excerpt}</p>
+          <p className="text-lg text-gray-600 dark:text-gray-300 mb-8 leading-relaxed">{post.excerpt}</p>
         )}
         <div
-          className="prose prose-lg dark:prose-invert max-w-none text-gray-700 dark:text-gray-300"
+          className="prose prose-lg dark:prose-invert max-w-none prose-headings:tracking-tight prose-p:leading-relaxed text-gray-600 dark:text-gray-300"
           dangerouslySetInnerHTML={{ __html: post.body || '' }}
         />
       </article>

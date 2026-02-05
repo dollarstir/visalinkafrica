@@ -785,6 +785,32 @@ class ApiService {
     });
   }
 
+  // Page sections (public + admin)
+  async getPageSections(slug) {
+    const res = await fetch(`${this.baseURL}/website/pages/${encodeURIComponent(slug)}/sections`);
+    if (!res.ok) return { sections: [] };
+    return res.json();
+  }
+  async getWebsiteSections(pageSlug) {
+    const qs = pageSlug ? `?page_slug=${encodeURIComponent(pageSlug)}` : '';
+    return this.request(`/website/sections${qs}`);
+  }
+  async createWebsiteSection(data) {
+    return this.request('/website/sections', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateWebsiteSection(id, data) {
+    return this.request(`/website/sections/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteWebsiteSection(id) {
+    return this.request(`/website/sections/${id}`, { method: 'DELETE' });
+  }
+  async reorderWebsiteSections(pageSlug, sectionIds) {
+    return this.request('/website/sections/reorder', {
+      method: 'PATCH',
+      body: JSON.stringify({ page_slug: pageSlug, section_ids: sectionIds })
+    });
+  }
+
   // Website image upload (admin)
   async uploadWebsiteImage(file) {
     const token = localStorage.getItem('token');

@@ -278,6 +278,20 @@ const createTables = async () => {
       )
     `);
 
+    // Page builder sections (Elementor-style: ordered blocks per page)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS website_page_sections (
+        id SERIAL PRIMARY KEY,
+        page_slug VARCHAR(100) NOT NULL DEFAULT 'home',
+        block_type VARCHAR(50) NOT NULL,
+        block_props JSONB DEFAULT '{}',
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Homepage / page image slider
     await pool.query(`
       CREATE TABLE IF NOT EXISTS website_slides (
@@ -454,6 +468,23 @@ const insertSampleData = async () => {
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (slug) DO NOTHING`,
         [slug, title, body, '']
+      );
+    }
+
+    // Seed default home page sections (hero first, agent_cta last)
+    const homeSections = [
+      { block_type: 'hero', block_props: { title: 'Our Services', subtitle: 'Visa applications, passport services, and document assistance across Africa.', cta_text: 'Get Started', cta_link: '/services' }, sort_order: 1 },
+      { block_type: 'features', block_props: { title: 'Why Choose Us', items: [{ title: 'Expert Support', description: 'Dedicated team for your visa journey' }, { title: 'Fast Processing', description: 'Streamlined applications and updates' }, { title: 'Transparent Fees', description: 'No hidden costs' }] }, sort_order: 2 },
+      { block_type: 'text', block_props: { title: 'About VisaLink Africa', content: '<p>We help individuals and businesses with visa applications, passport services, and document legalization across the continent.</p>' }, sort_order: 3 },
+      { block_type: 'cta', block_props: { title: 'Ready to Start?', subtitle: 'Get a quote or book a consultation.', button_text: 'Contact Us', button_link: '/contact' }, sort_order: 4 },
+      { block_type: 'agent_cta', block_props: { title: 'Become an Agent', subtitle: 'Join our network and grow your business.', button_text: 'Apply Now', button_link: '/become-agent' }, sort_order: 5 }
+    ];
+    for (const s of homeSections) {
+      await pool.query(
+        `INSERT INTO website_page_sections (page_slug, block_type, block_props, sort_order, is_active)
+         SELECT $1, $2, $3::jsonb, $4, true
+         WHERE NOT EXISTS (SELECT 1 FROM website_page_sections WHERE page_slug = $1 AND block_type = $2 AND sort_order = $4)`,
+        ['home', s.block_type, JSON.stringify(s.block_props), s.sort_order]
       );
     }
 

@@ -143,6 +143,125 @@ router.put('/pages', authenticateToken, requirePermission('website.update'), asy
   }
 });
 
+// ---------- Page sections (builder) ----------
+// Public: get active sections for a page
+router.get('/pages/:slug/sections', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const result = await pool.query(
+      `SELECT id, page_slug, block_type, block_props, sort_order
+       FROM website_page_sections
+       WHERE page_slug = $1 AND is_active = true
+       ORDER BY sort_order ASC, id ASC`,
+      [slug]
+    );
+    res.json({ sections: result.rows });
+  } catch (error) {
+    console.error('Get page sections error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin: list sections (optional page_slug)
+router.get('/sections', authenticateToken, requirePermission('website.update'), async (req, res) => {
+  try {
+    const { page_slug } = req.query;
+    let query = 'SELECT * FROM website_page_sections WHERE 1=1';
+    const params = [];
+    if (page_slug) {
+      params.push(page_slug);
+      query += ` AND page_slug = $${params.length}`;
+    }
+    query += ' ORDER BY page_slug, sort_order ASC, id ASC';
+    const result = await pool.query(query, params);
+    res.json({ sections: result.rows });
+  } catch (error) {
+    console.error('Get sections error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/sections', authenticateToken, requirePermission('website.update'), async (req, res) => {
+  try {
+    const { page_slug = 'home', block_type, block_props = {}, sort_order = 0, is_active = true } = req.body;
+    if (!block_type) {
+      return res.status(400).json({ error: 'block_type is required' });
+    }
+    const result = await pool.query(
+      `INSERT INTO website_page_sections (page_slug, block_type, block_props, sort_order, is_active)
+       VALUES ($1, $2, $3::jsonb, $4, $5)
+       RETURNING *`,
+      [page_slug, block_type, JSON.stringify(block_props), parseInt(sort_order, 10) || 0, !!is_active]
+    );
+    res.status(201).json({ section: result.rows[0], message: 'Section created' });
+  } catch (error) {
+    console.error('Create section error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/sections/:id', authenticateToken, requirePermission('website.update'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page_slug, block_type, block_props, sort_order, is_active } = req.body;
+    const updates = [];
+    const values = [];
+    let n = 0;
+    if (page_slug !== undefined) { n++; updates.push(`page_slug = $${n}`); values.push(page_slug); }
+    if (block_type !== undefined) { n++; updates.push(`block_type = $${n}`); values.push(block_type); }
+    if (block_props !== undefined) { n++; updates.push(`block_props = $${n}::jsonb`); values.push(JSON.stringify(block_props)); }
+    if (sort_order !== undefined) { n++; updates.push(`sort_order = $${n}`); values.push(parseInt(sort_order, 10)); }
+    if (is_active !== undefined) { n++; updates.push(`is_active = $${n}`); values.push(!!is_active); }
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+    n++; updates.push('updated_at = CURRENT_TIMESTAMP'); values.push(id);
+    const result = await pool.query(
+      `UPDATE website_page_sections SET ${updates.join(', ')} WHERE id = $${n} RETURNING *`,
+      values
+    );
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Section not found' });
+    res.json({ section: result.rows[0], message: 'Section updated' });
+  } catch (error) {
+    console.error('Update section error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.delete('/sections/:id', authenticateToken, requirePermission('website.update'), async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM website_page_sections WHERE id = $1 RETURNING id', [req.params.id]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'Section not found' });
+    res.json({ message: 'Section deleted' });
+  } catch (error) {
+    console.error('Delete section error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.patch('/sections/reorder', authenticateToken, requirePermission('website.update'), async (req, res) => {
+  try {
+    const { page_slug, section_ids } = req.body;
+    if (!page_slug || !Array.isArray(section_ids) || section_ids.length === 0) {
+      return res.status(400).json({ error: 'page_slug and section_ids (array) are required' });
+    }
+    for (let i = 0; i < section_ids.length; i++) {
+      await pool.query(
+        'UPDATE website_page_sections SET sort_order = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND page_slug = $3',
+        [i, section_ids[i], page_slug]
+      );
+    }
+    const result = await pool.query(
+      'SELECT * FROM website_page_sections WHERE page_slug = $1 ORDER BY sort_order, id',
+      [page_slug]
+    );
+    res.json({ sections: result.rows, message: 'Sections reordered' });
+  } catch (error) {
+    console.error('Reorder sections error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ---------- Slider ----------
 // Public: get active slides for a page (default home)
 router.get('/slides', async (req, res) => {
