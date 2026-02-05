@@ -26,10 +26,6 @@ import { Navigate } from 'react-router-dom';
 
 const Services = () => {
   const { user } = useAuth();
-
-  if (user?.role === 'customer') {
-    return <CustomerServices />;
-  }
   const [showNewServiceModal, setShowNewServiceModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -369,6 +365,10 @@ const Services = () => {
   };
 
   const statusCounts = getStatusCounts();
+
+  if (user?.role === 'customer') {
+    return <CustomerServices />;
+  }
 
   if (loading && services.length === 0) {
     return (

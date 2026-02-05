@@ -211,15 +211,6 @@ const Login = ({ onLogin }) => {
               )}
             </button>
           </form>
-
-          {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
-            <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Demo Credentials:</h4>
-            <div className="text-sm text-gray-600 dark:text-gray-300">
-              <p><strong>Email:</strong> admin@visalink.com</p>
-              <p><strong>Password:</strong> Admin@123</p>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
