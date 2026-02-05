@@ -108,7 +108,7 @@ const createTables = async () => {
         id SERIAL PRIMARY KEY,
         first_name VARCHAR(255) NOT NULL,
         last_name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) NOT NULL,
+        email VARCHAR(255),
         phone VARCHAR(20),
         purpose VARCHAR(255),
         visit_date DATE NOT NULL,
@@ -120,6 +120,7 @@ const createTables = async () => {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    await pool.query(`ALTER TABLE visitors ALTER COLUMN email DROP NOT NULL`).catch(() => {});
 
     // Visits table
     await pool.query(`
@@ -496,10 +497,18 @@ const insertSampleData = async () => {
   }
 };
 
+// Run: node scripts/migrate.js          → creates/updates tables only (no sample data)
+// Run: RUN_SEED=1 node scripts/migrate.js  → also inserts sample/dummy data
 const runMigration = async () => {
   try {
     await createTables();
-    await insertSampleData();
+    const runSeed = process.env.RUN_SEED === '1' || process.env.SEED === '1';
+    if (runSeed) {
+      await insertSampleData();
+      console.log('Sample data seeded.');
+    } else {
+      console.log('Skipping sample data (set RUN_SEED=1 or SEED=1 to seed).');
+    }
     console.log('Migration completed successfully!');
     process.exit(0);
   } catch (error) {

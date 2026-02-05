@@ -61,9 +61,7 @@ import { X, User, Mail, Phone, Calendar, Clock, AlertCircle } from 'lucide-react
       newErrors.lastName = 'Last name is required';
     }
 
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+    if (formData.email.trim() && !/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email is invalid';
     }
 
@@ -99,7 +97,7 @@ import { X, User, Mail, Phone, Calendar, Clock, AlertCircle } from 'lucide-react
       const visitorData = {
         first_name: formData.firstName,
         last_name: formData.lastName,
-        email: formData.email,
+        email: formData.email.trim() || null,
         phone: formData.phone,
         purpose: formData.purpose,
         notes: formData.notes
@@ -196,7 +194,7 @@ import { X, User, Mail, Phone, Calendar, Clock, AlertCircle } from 'lucide-react
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="label">Email Address *</label>
+                    <label className="label">Email Address (optional)</label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                       <input

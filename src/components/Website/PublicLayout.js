@@ -125,7 +125,7 @@ const PublicLayout = () => {
         </div>
       </header>
 
-      <main className="flex-1">
+      <main className="flex-1 overflow-x-hidden">
         <Outlet />
       </main>
 

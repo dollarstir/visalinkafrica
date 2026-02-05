@@ -42,9 +42,7 @@ const EditVisitorModal = ({ visitor, onClose, onSave }) => {
     if (!formData.lastName.trim()) {
       newErrors.lastName = 'Last name is required';
     }
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+    if (formData.email.trim() && !/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email is invalid';
     }
     if (!formData.phone.trim()) {
@@ -74,7 +72,7 @@ const EditVisitorModal = ({ visitor, onClose, onSave }) => {
       const visitorData = {
         first_name: formData.firstName,
         last_name: formData.lastName,
-        email: formData.email,
+        email: formData.email.trim() || null,
         phone: formData.phone,
         purpose: formData.purpose,
         visit_date: formData.visitDate,
@@ -174,7 +172,7 @@ const EditVisitorModal = ({ visitor, onClose, onSave }) => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="label">Email Address *</label>
+                <label className="label">Email Address (optional)</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input

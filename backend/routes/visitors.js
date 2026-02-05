@@ -110,11 +110,13 @@ router.post('/', authenticateToken, async (req, res) => {
       notes = null
     } = req.body;
 
+    const emailVal = (email != null && String(email).trim()) ? String(email).trim() : null;
+
     const result = await pool.query(
       `INSERT INTO visitors (first_name, last_name, email, phone, purpose, visit_date, visit_time, status, staff_member, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
-      [first_name, last_name, email, phone, purpose, visit_date, visit_time, status, staff_member, notes]
+      [first_name, last_name, emailVal, phone || null, purpose || null, visit_date, visit_time, status, staff_member, notes]
     );
 
     res.status(201).json({
@@ -153,6 +155,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
       notes
     } = req.body;
 
+    const emailVal = (email != null && String(email).trim()) ? String(email).trim() : null;
+
     const result = await pool.query(
       `UPDATE visitors SET 
        first_name = $1, last_name = $2, email = $3, phone = $4, purpose = $5,
@@ -160,7 +164,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
        updated_at = CURRENT_TIMESTAMP
        WHERE id = $11
        RETURNING *`,
-      [first_name, last_name, email, phone, purpose, visit_date, visit_time, status, staff_member, notes, id]
+      [first_name, last_name, emailVal, phone || null, purpose || null, visit_date, visit_time, status, staff_member, notes, id]
     );
 
     if (result.rows.length === 0) {
