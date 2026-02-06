@@ -78,11 +78,15 @@ app.use(helmet({
   contentSecurityPolicy: process.env.NODE_ENV === 'production' ? undefined : false
 }));
 
-// Rate limiting
+// Rate limiting (allow enough for normal app use: dashboard, lists, etc.)
+const rateLimitWindowMs = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '15', 10) * 60 * 1000; // default 15 min
+const rateLimitMax = parseInt(process.env.RATE_LIMIT_MAX || '500', 10); // default 500 per window
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
+  windowMs: rateLimitWindowMs,
+  max: rateLimitMax,
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false
 });
 app.use(limiter);
 

@@ -58,10 +58,10 @@ const HomePage = () => {
           ))}
           {/* Content from Admin → Website → Pages → Home (so homepage shows what you edit there) */}
           {hasHomeBody && (
-            <section className="py-20 md:py-24 bg-slate-50 dark:bg-gray-800/50">
-              <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
+            <section className="section-padding bg-slate-50 dark:bg-gray-800/50">
+              <div className="container-narrow">
                 <div
-                  className="prose prose-lg dark:prose-invert max-w-none prose-headings:tracking-tight prose-p:leading-relaxed text-gray-600 dark:text-gray-300"
+                  className="prose prose-slate prose-lg dark:prose-invert max-w-none prose-headings:tracking-tight prose-p:leading-relaxed text-slate-600 dark:text-gray-400"
                   dangerouslySetInnerHTML={{ __html: homePage.body }}
                 />
               </div>
@@ -69,13 +69,14 @@ const HomePage = () => {
           )}
         </>
       )}
-      <section className="py-10 bg-slate-100 dark:bg-gray-800/80 border-t border-slate-200 dark:border-gray-700">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl text-center">
+      <section className="py-8 bg-slate-100 dark:bg-gray-800/60 border-t border-slate-200 dark:border-gray-700">
+        <div className="container-wide flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-4 text-center">
+          <span className="text-sm text-slate-500 dark:text-gray-500">Staff & agents</span>
           <Link
             to="/login"
-            className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+            className="text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors underline underline-offset-2"
           >
-            Staff & agents: Login to CRM
+            Login to CRM
           </Link>
         </div>
       </section>

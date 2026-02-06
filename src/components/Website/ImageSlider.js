@@ -40,13 +40,13 @@ const ImageSlider = ({ pageSlug = 'home', intervalMs = 6000, className = '' }) =
   const imgUrl = getImageUrl(slide.image_url);
 
   return (
-    <section className={`relative w-screen max-w-none left-1/2 -translate-x-1/2 overflow-hidden pt-16 sm:pt-0 ${className}`}>
+    <section className={`relative w-screen max-w-none left-1/2 -translate-x-1/2 overflow-hidden pt-14 sm:pt-0 ${className}`}>
       {/* Mobile: 4:3, full width so no gap on right; sm+: 16:9 so more image content shows on large screens */}
       <div className="relative w-full aspect-[4/3] sm:aspect-video min-h-[200px] sm:min-h-[260px] max-h-[70vh] sm:max-h-[400px] md:max-h-[500px] bg-gray-900">
           <img
             src={imgUrl}
             alt={slide.title || 'Slide'}
-            className="absolute inset-0 w-full h-full object-cover object-center"
+            className="absolute inset-0 w-full h-full object-cover md:object-contain object-center bg-gray-900"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
           <div className="absolute inset-0 flex items-end justify-center text-center px-4 pb-10 sm:pb-12 md:pb-16 lg:pb-20">
@@ -65,7 +65,7 @@ const ImageSlider = ({ pageSlug = 'home', intervalMs = 6000, className = '' }) =
                 <Link
                   to={slide.link_url.startsWith('/') ? slide.link_url : '#'}
                   href={slide.link_url.startsWith('http') ? slide.link_url : undefined}
-                  className="inline-flex items-center gap-2 px-5 py-3 sm:px-6 sm:py-3.5 bg-white text-gray-900 font-semibold rounded-xl shadow-card hover:shadow-card-hover transition-all duration-200 text-sm sm:text-base"
+                  className="inline-flex items-center gap-2 px-5 py-3 sm:px-6 sm:py-3.5 bg-white text-slate-900 font-semibold rounded-lg shadow-corporate hover:shadow-corporate-lg transition-all duration-200 text-sm sm:text-base"
                 >
                   Learn more
                   <ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" />
