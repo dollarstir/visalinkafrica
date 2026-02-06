@@ -242,7 +242,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
     }
 
     const result = await pool.query(
-      `SELECT a.*, c.first_name, c.last_name, c.email, c.phone, s.name as service_name, 
+      `SELECT a.*, c.first_name, c.last_name, c.email, c.phone, s.name as service_name, s.pricing_tiers as service_pricing_tiers,
               CONCAT(st.first_name, ' ', st.last_name) as staff_name,
               u_agent.name as agent_name
        FROM applications a

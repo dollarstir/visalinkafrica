@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import apiService from '../../services/api';
 import { showSuccess, showError, showDeleteConfirm } from '../../utils/toast';
+import { formatPrice } from '../../utils/currency';
 import { useAuth } from '../Auth/AuthContext';
 import { hasPermission } from '../../utils/permissions';
 import NewApplicationModal from './NewApplicationModal';
@@ -183,7 +184,15 @@ const Applications = () => {
       // Fetch full application details
       const response = await apiService.getApplication(application.id);
       const app = response.application;
-      
+      const selectedTierName = app.selected_tier_name || null;
+      let selectedTierPrice = null;
+      const tiers = app.service_pricing_tiers != null
+        ? (Array.isArray(app.service_pricing_tiers) ? app.service_pricing_tiers : (typeof app.service_pricing_tiers === 'string' ? (() => { try { return JSON.parse(app.service_pricing_tiers); } catch { return []; } })() : []))
+        : [];
+      if (selectedTierName && tiers.length) {
+        const tier = tiers.find(t => (t.name || '').trim() === (selectedTierName || '').trim());
+        if (tier && (tier.price != null || tier.price === 0)) selectedTierPrice = tier.price;
+      }
       const transformedApp = {
         id: app.id,
         customerName: `${app.first_name || ''} ${app.last_name || ''}`.trim(),
@@ -201,7 +210,9 @@ const Applications = () => {
         notes: app.notes || '',
         documents: app.documents || [],
         estimated_completion_date: app.estimated_completion_date,
-        actual_completion_date: app.actual_completion_date
+        actual_completion_date: app.actual_completion_date,
+        selectedTierName,
+        selectedTierPrice: selectedTierPrice != null ? formatPrice(selectedTierPrice) : null
       };
       
       setSelectedApplication(transformedApp);

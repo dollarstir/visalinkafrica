@@ -115,11 +115,11 @@ const ViewApplicationModal = ({ application, onClose }) => {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Pricing Tier</label>
-                    <p className="text-sm text-gray-900">{application.pricingTier || 'Standard'}</p>
+                    <p className="text-sm text-gray-900">{application.selectedTierName || application.pricingTier || '—'}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Price</label>
-                    <p className="text-sm text-gray-900">${application.price || 'N/A'}</p>
+                    <p className="text-sm text-gray-900">{application.selectedTierPrice ?? application.price ?? '—'}</p>
                   </div>
                 </div>
               </div>
