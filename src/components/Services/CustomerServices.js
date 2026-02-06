@@ -1,9 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Settings, Search, Send, ArrowRight, FileText } from 'lucide-react';
+import { Settings, Search, Send, FileText, X } from 'lucide-react';
 import apiService from '../../services/api';
 import { showSuccess, showError } from '../../utils/toast';
 import { formatPrice } from '../../utils/currency';
+
+const getTiersFromService = (service) => {
+  if (!service || !service.pricing_tiers) return [];
+  try {
+    const raw = service.pricing_tiers;
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') return JSON.parse(raw) || [];
+    return [];
+  } catch (e) {
+    return [];
+  }
+};
 
 const CustomerServices = () => {
   const [services, setServices] = useState([]);
@@ -12,6 +24,8 @@ const CustomerServices = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [applyingId, setApplyingId] = useState(null);
+  const [tierModalService, setTierModalService] = useState(null);
+  const [selectedTierName, setSelectedTierName] = useState('');
 
   useEffect(() => {
     loadCategories();
@@ -50,11 +64,33 @@ const CustomerServices = () => {
     }
   };
 
-  const handleApply = async (serviceId) => {
+  const openTierModal = (service) => {
+    setTierModalService(service);
+    const tiers = getTiersFromService(service);
+    const defaultTier = tiers.find(t => t.isDefault) || tiers[0];
+    setSelectedTierName(defaultTier ? (defaultTier.name || '') : '');
+  };
+
+  const closeTierModal = () => {
+    setTierModalService(null);
+    setSelectedTierName('');
+  };
+
+  const handleApplyWithTier = async () => {
+    if (!tierModalService) return;
+    const tiers = getTiersFromService(tierModalService);
+    if (tiers.length > 0 && !selectedTierName) {
+      showError('Please select a tier.');
+      return;
+    }
     try {
-      setApplyingId(serviceId);
-      await apiService.createApplication({ service_id: serviceId });
+      setApplyingId(tierModalService.id);
+      await apiService.createApplication({
+        service_id: tierModalService.id,
+        selected_tier_name: selectedTierName || null
+      });
       showSuccess('Application submitted. You can track it under My Applications.');
+      closeTierModal();
       loadServices();
     } catch (err) {
       showError(err.message || 'Failed to submit application');
@@ -136,7 +172,7 @@ const CustomerServices = () => {
                 )}
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-2">Price: {getPricingDisplay(service)}</p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
                 <Link
                   to="/app/applications"
                   className="btn-outline flex items-center gap-2"
@@ -146,16 +182,92 @@ const CustomerServices = () => {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => handleApply(service.id)}
+                  onClick={() => openTierModal(service)}
                   disabled={applyingId !== null}
                   className="btn-primary flex items-center gap-2"
                 >
                   <Send className="h-4 w-4" />
-                  {applyingId === service.id ? 'Submitting...' : 'Apply'}
+                  Apply
                 </button>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Tier selection modal */}
+      {tierModalService && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={closeTierModal} aria-hidden />
+            <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Select tier</h3>
+                <button type="button" onClick={closeTierModal} className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                {tierModalService.name}
+              </p>
+              {(() => {
+                const tiers = getTiersFromService(tierModalService);
+                if (tiers.length === 0) {
+                  return (
+                    <p className="text-sm text-amber-600 dark:text-amber-400 py-4">
+                      No pricing tiers configured for this service. Please contact support.
+                    </p>
+                  );
+                }
+                return (
+                  <>
+                    <div className="space-y-2 mb-6">
+                      {tiers.map((tier) => {
+                        const name = tier.name || '';
+                        const price = tier.price != null ? formatPrice(tier.price) : '—';
+                        const duration = tier.duration || '';
+                        const isSelected = selectedTierName === name;
+                        return (
+                          <button
+                            key={name}
+                            type="button"
+                            onClick={() => setSelectedTierName(name)}
+                            className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
+                              isSelected
+                                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 dark:border-primary-400'
+                                : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                            }`}
+                          >
+                            <div className="flex justify-between items-start">
+                              <span className="font-medium text-gray-900 dark:text-white">{name}</span>
+                              <span className="font-semibold text-primary-600 dark:text-primary-400">{price}</span>
+                            </div>
+                            {duration && (
+                              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Processing: {duration}</p>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={closeTierModal} className="btn-outline flex-1">
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleApplyWithTier}
+                        disabled={applyingId !== null}
+                        className="btn-primary flex-1 flex items-center justify-center gap-2"
+                      >
+                        <Send className="h-4 w-4" />
+                        {applyingId === tierModalService.id ? 'Submitting...' : 'Submit application'}
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
         </div>
       )}
     </div>

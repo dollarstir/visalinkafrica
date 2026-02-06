@@ -101,6 +101,7 @@ const createTables = async () => {
     `);
     await pool.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS agent_user_id INTEGER REFERENCES users(id)`);
     await pool.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS application_source VARCHAR(50) DEFAULT 'staff'`);
+    await pool.query(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS selected_tier_name VARCHAR(100)`);
 
     // Visitors table
     await pool.query(`

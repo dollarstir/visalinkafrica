@@ -107,27 +107,23 @@ const Applications = () => {
       const transformedApplications = (response.applications || []).map(app => {
         console.log('Transforming application:', app);
 
-        // Determine source info from creator (who created the application)
+        // Determine source from application_source (DB) first, then fallbacks
+        const source = (app.application_source || '').toLowerCase().replace(/\s/g, '_');
         let sourceType = 'Other';
         let sourceLabel = 'System';
 
-        if (app.creator_role === 'agent') {
+        if (source === 'self-applied' || source === 'self_applied') {
+          sourceType = 'Customer';
+          sourceLabel = 'Self-applied';
+        } else if (app.creator_role === 'agent' || source === 'agent' || app.agent_user_id) {
           sourceType = 'Agent';
-          sourceLabel = app.creator_name || 'Agent';
-        } else if (app.creator_role === 'staff') {
+          sourceLabel = app.creator_name || app.agent_name || 'Agent';
+        } else if (app.creator_role === 'staff' || app.staff_id) {
           sourceType = 'Staff';
-          sourceLabel = app.creator_name || 'Staff';
-        } else if (app.creator_role === 'admin') {
+          sourceLabel = app.creator_name || app.staff_name || (app.staff_id ? `Staff #${app.staff_id}` : 'Staff');
+        } else if (app.creator_role === 'admin' || source === 'staff') {
           sourceType = 'Admin';
           sourceLabel = app.creator_name || 'Admin / Back Office';
-        } else if (app.agent_user_id) {
-          // Fallback: if creator_role is missing but agent_user_id exists
-          sourceType = 'Agent';
-          sourceLabel = app.agent_name || `Agent #${app.agent_user_id}`;
-        } else if (app.staff_id) {
-          // Fallback: created by staff if no creator info but staff assigned
-          sourceType = 'Staff';
-          sourceLabel = app.staff_name || `Staff #${app.staff_id}`;
         } else {
           sourceType = 'Admin';
           sourceLabel = 'Admin / Back Office';

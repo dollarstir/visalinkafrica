@@ -40,7 +40,7 @@ const ImageSlider = ({ pageSlug = 'home', intervalMs = 6000, className = '' }) =
   const imgUrl = getImageUrl(slide.image_url);
 
   return (
-    <section className={`relative w-screen max-w-none left-1/2 -translate-x-1/2 overflow-hidden ${className}`}>
+    <section className={`relative w-screen max-w-none left-1/2 -translate-x-1/2 overflow-hidden pt-16 sm:pt-0 ${className}`}>
       {/* Mobile: 4:3, full width so no gap on right; sm+: 16:9 so more image content shows on large screens */}
       <div className="relative w-full aspect-[4/3] sm:aspect-video min-h-[200px] sm:min-h-[260px] max-h-[70vh] sm:max-h-[400px] md:max-h-[500px] bg-gray-900">
           <img

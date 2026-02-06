@@ -298,7 +298,8 @@ router.post('/', authenticateToken, async (req, res) => {
       priority = 'normal',
       documents,
       notes,
-      estimated_completion_date
+      estimated_completion_date,
+      selected_tier_name
     } = req.body;
 
     // Customer (portal self-service): use their linked customer record and set source to self-applied
@@ -322,10 +323,10 @@ router.post('/', authenticateToken, async (req, res) => {
     const agentUserId = userRole === 'agent' ? userId : null;
     const applicationSource = userRole === 'customer' ? 'self-applied' : (userRole === 'agent' ? 'agent' : 'staff');
 
-    const insertQuery = `INSERT INTO applications (customer_id, service_id, staff_id, agent_user_id, application_source, status, priority, documents, notes, estimated_completion_date)
-                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    const insertQuery = `INSERT INTO applications (customer_id, service_id, staff_id, agent_user_id, application_source, status, priority, documents, notes, estimated_completion_date, selected_tier_name)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                          RETURNING *`;
-    const insertParams = [customer_id, service_id, staff_id, agentUserId, applicationSource, effectiveStatus, priority, documents || null, notes || null, effectiveEstimatedDate];
+    const insertParams = [customer_id, service_id, staff_id, agentUserId, applicationSource, effectiveStatus, priority, documents || null, notes || null, effectiveEstimatedDate, selected_tier_name && String(selected_tier_name).trim() ? String(selected_tier_name).trim() : null];
 
     const result = await pool.query(insertQuery, insertParams);
     const application = result.rows[0];
